@@ -717,8 +717,3 @@ LANCAST is currently a solo-developed project. Proposed contributions should res
 ## 22. License
 
 This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for full terms.
-
-
-## 22. License
-
-This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for full terms.
