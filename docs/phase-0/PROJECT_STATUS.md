@@ -37,28 +37,30 @@
 - [ ] Review threat model.
 - [ ] Review experiment plan.
 - [ ] Review technology decisions.
-- [ ] Conduct focused literature review with verified sources.
-- [ ] Record actual development/test hardware and LAN topology.
-- [ ] Resolve decisions blocking Phase 1.
+- [x] Conduct focused literature review with verified sources (`07_LITERATURE_REVIEW.md`; full-PDF verification of provisional papers tracked for manuscript phase).
+- [x] Record actual development/test hardware and LAN topology (`08_TESTBED_MANIFEST.md`).
+- [x] Resolve decisions blocking Phase 1 (`O-01`, `O-02`, `O-04`, `O-05`, `O-06`, `O-07`).
 - [ ] Freeze Phase 0 and record approval.
 
 ## Open decisions
-| ID | Decision | Proposed resolution |
+| ID | Decision | Status / Resolution |
 |---|---|---|
-| O-01 | Frontend framework | Choose simplest option meeting UI/routing needs |
+| O-01 | Frontend framework | **Resolved:** React + Vite + TypeScript SPA served via nginx behind Traefik |
 | O-02 | Local identity in standalone | **Resolved:** Local FastAPI authentication backed by PostgreSQL (same in central and standalone; optional external `DATABASE_URL` does not change local auth) |
 | O-03 | Execution backend | Judge0 + `isolate` selected; audit and document isolation limits in Phase 1/3 |
-| O-04 | Queue/broker | Define queue contract, then select implementation |
-| O-05 | LAN TLS | Decide based on campus certificate/private CA availability |
-| O-06 | Audit key protection | Choose protected signing/checkpoint approach |
-| O-07 | Test hardware | Record actual machine specifications and topology |
-| O-08 | Numerical SLOs | Establish from pilot measurements; do not invent |
+| O-04 | Queue/broker | **Resolved (Phase 1–2):** Redis behind an explicit queue abstraction |
+| O-05 | LAN TLS | **Resolved:** Traefik `:80` HTTP for local dev; `:443` HTTPS with local/private CA cert (`mkcert` or campus IT CA) via file provider for LAN deployments |
+| O-06 | Audit key protection | **Resolved:** Ed25519 signing key mounted as read-only secret outside DB/app user + periodic signed checkpoints |
+| O-07 | Test hardware | **Resolved (dev/standalone):** Recorded in `08_TESTBED_MANIFEST.md` (i7-11800H 8C/16T, 16 GB RAM, NVMe, Omarchy 4.5.0, Docker 29.9.2 / Compose 5.6.1) |
+| O-08 | Numerical SLOs | Deferred to pilot measurements; do not invent |
 
 ## Change log
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-11-23 | Initial Phase 0 package; project named LANCAST; standalone confirmed as single-machine deployment |
 | 1.1 | 2026-11-23 | Locked in Traefik + React SPA (nginx) + FastAPI pool + Judge0 topology; confirmed local PostgreSQL + local FastAPI auth by default with optional external `DATABASE_URL` |
+| 1.2 | 2026-11-24 | Added focused literature review and gap analysis (`07_LITERATURE_REVIEW.md`) integrating domain PDF papers with resource QoS, Zero Trust/context-aware access control, and tamper-evident logging literature |
+| 1.3 | 2026-11-24 | Recorded local dev/standalone testbed manifest (`08_TESTBED_MANIFEST.md`), populated `docs/phase-0/README.md`, and resolved Phase 1 blocking decisions (`O-01`, `O-04`, `O-05`, `O-06`, `O-07`) |
 
 ## Working rule
 A phase is not complete because code has been generated. It is complete only when acceptance criteria are demonstrated with tests, evidence and updated documentation.

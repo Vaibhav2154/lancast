@@ -612,6 +612,8 @@ A feature is complete only when implementation, tests, authorization/failure beh
 - [04_THREAT_MODEL.md](docs/phase-0/04_THREAT_MODEL.md) — assets, trust boundaries, threats, and mitigations.
 - [05_EXPERIMENT_PLAN.md](docs/phase-0/05_EXPERIMENT_PLAN.md) — baselines, workloads, metrics, and analysis.
 - [06_TECHNOLOGY_DECISIONS.md](docs/phase-0/06_TECHNOLOGY_DECISIONS.md) — stack decisions and open ADRs.
+- [07_LITERATURE_REVIEW.md](docs/phase-0/07_LITERATURE_REVIEW.md) — focused literature review and gap analysis across all three research pillars.
+- [08_TESTBED_MANIFEST.md](docs/phase-0/08_TESTBED_MANIFEST.md) — local dev/standalone hardware manifest and central testbed template.
 - [PROJECT_STATUS.md](docs/phase-0/PROJECT_STATUS.md) — phase tracker, confirmed decisions, and open items.
 
 ### Target Documentation Layout

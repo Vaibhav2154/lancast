@@ -8,7 +8,7 @@ Prefer reproducible on-premises deployment, low solo-developer operational compl
 ## 2. Proposed stack
 | Layer | Proposal | Rationale / validation |
 |---|---|---|
-| Frontend | React + TypeScript (SPA served via nginx) | Familiar component ecosystem; static bundle served cleanly behind Traefik with zero client Internet dependency |
+| Frontend | React + Vite + TypeScript (SPA served via nginx behind Traefik) | Familiar component ecosystem; fast static bundle served cleanly behind Traefik with zero client Internet dependency |
 | Backend | Python + FastAPI (modular monolith) | Typed API, async support, Python research ecosystem; hosts local auth, tenancy, assessments and orchestrators |
 | Authentication | Local FastAPI auth (PostgreSQL-backed) | Zero external auth dependency; candidate browsers remain LAN-only even if an external DB URL is used later |
 | Database | PostgreSQL (local container default; optional external `DATABASE_URL`) | Transactions, relational constraints and tenant data; local by default for offline reliability and clean benchmarks, portable to external Postgres (e.g., Supabase DB URL) via connection string |
@@ -47,13 +47,19 @@ Prefer reproducible on-premises deployment, low solo-developer operational compl
 ## 5. Security/operations constraints
 Never commit secrets; do not mount Docker socket into candidate or execution containers; do not run candidate code as root or in API container; disable worker network by default; restrict management interfaces; pin images/dependencies; test backup/restore; document Internet dependencies.
 
-## 6. Open decisions
-1. React build tool (Vite SPA confirmed in spirit; finalize exact SPA template/routing setup).
-2. Whether Redis is sufficient or a dedicated broker is needed.
-3. Judge0 + `isolate` hardening details and resource limit verification.
-4. LAN TLS/certificate approach.
-5. Audit signing key protection and checkpoint design.
-6. Capacity estimator and scheduling algorithm.
-7. Numerical SLOs and candidate capacity, established only through pilot measurements.
+## 6. Decisions Resolved for Phase 1 & Remaining Deferred Items
 
-Resolve each through an ADR: context, alternatives, decision and consequences.
+**Resolved for Phase 1:**
+- **Frontend (`O-01`):** React + Vite + TypeScript SPA served via nginx behind Traefik.
+- **Local Identity (`O-02`):** Local FastAPI authentication backed by PostgreSQL (same in central and standalone; optional external `DATABASE_URL` does not change local auth).
+- **Queue/Broker (`O-04`):** Redis behind an internal queue abstraction for Phase 1–2 (re-evaluate dedicated broker only if durability/retry measurements require it).
+- **LAN TLS (`O-05`):** Traefik serves HTTP (`:80`) for local dev and HTTPS (`:443`) using a local/private CA certificate (`mkcert` or campus IT CA) via file provider for LAN deployments, with zero Internet dependency.
+- **Audit Signing Key (`O-06`):** Ed25519 signing key mounted as a read-only secret outside the database and ordinary app-user scope, used to sign periodic tamper-evident audit checkpoints.
+- **Testbed Hardware (`O-07`):** Recorded in [08_TESTBED_MANIFEST.md](08_TESTBED_MANIFEST.md).
+
+**Deferred to Later Phases (non-blocking for Phase 0):**
+1. **Judge0 + `isolate` hardening audit (`O-03`):** Verify container capabilities, limits, and network isolation during Phase 1/3.
+2. **Capacity estimator & scheduling algorithm details:** Formalize exact deterministic equations and weights in Phase 5.
+3. **Numerical SLOs and candidate capacity (`O-08`):** Establish strictly through pilot measurements on the recorded testbed.
+
+Record formal ADRs under `docs/architecture/decisions/` during Phase 1.
