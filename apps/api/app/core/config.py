@@ -29,8 +29,9 @@ class Settings(BaseSettings):
     auth_secret_key: str = Field(default="dev-only-change-me-in-production", min_length=16)
     session_ttl_minutes: int = Field(default=480, ge=5, le=1440)
 
-    # Execution worker authentication (workers hold no DB credentials; T19)
+    # Execution worker & sandbox (workers hold no DB credentials; T19)
     worker_shared_secret: str = Field(default="dev-only-worker-secret-change-me", min_length=16)
+    judge0_url: str = "http://judge0-server:2358"
 
     # Observability & safety bounds
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"

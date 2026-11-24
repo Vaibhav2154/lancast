@@ -38,6 +38,7 @@ services:
       SESSION_TTL_MINUTES: ${SESSION_TTL_MINUTES:-480}
       EXECUTION_QUEUE_MAX_DEPTH: ${EXECUTION_QUEUE_MAX_DEPTH:-500}
       WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET:-dev-only-worker-secret-change-me}
+      JUDGE0_URL: ${JUDGE0_URL:-http://judge0-server:2358}
       UPLOAD_DIR: /var/lib/lancast/uploads
     volumes:
       - uploads_data:/var/lib/lancast/uploads

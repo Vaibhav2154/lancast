@@ -70,3 +70,25 @@ class ExecutionResultIn(BaseModel):
     test_results: list[ExecutionResultCase] = Field(default_factory=list, max_length=50)
     worker_id: str | None = Field(default=None, max_length=128)
     error: str | None = Field(default=None, max_length=500)
+
+
+class CodeRunRequest(BaseModel):
+    language: str
+    source_code: str = Field(min_length=1)
+    custom_stdin: str | None = Field(default=None, max_length=10000)
+
+
+class CodeRunCaseOut(BaseModel):
+    stdin: str
+    expected_stdout: str | None
+    stdout: str
+    stderr: str
+    compile_output: str
+    verdict: str
+    passed: bool | None
+    time_sec: float | None
+
+
+class CodeRunResponse(BaseModel):
+    mode: Literal["sample_cases", "custom_input"]
+    cases: list[CodeRunCaseOut]

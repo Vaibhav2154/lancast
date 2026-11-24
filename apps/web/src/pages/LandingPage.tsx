@@ -1,17 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, BookOpen, ClipboardList, Moon, Shield, Sun } from "lucide-react";
+import { primaryPortalPath, useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
-import {
-  fetchHealth,
-  fetchMe,
-  fetchReadiness,
-  getStoredToken,
-  HealthInfo,
-  login,
-  logout,
-  MeResponse,
-  ReadinessInfo,
-  setStoredToken,
-} from "../lib/api";
+import { fetchHealth, fetchReadiness, HealthInfo, ReadinessInfo } from "../lib/api";
 
 const TENANTS = [
   { name: "CSE Dept", style: "font-extrabold text-ink-secondary" },
@@ -42,11 +34,14 @@ const FEATURES = [
 
 export function LandingPage() {
   const { theme, toggleTheme } = useTheme();
+  const { me, signIn, registerFirstAdmin, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [readiness, setReadiness] = useState<ReadinessInfo | null>(null);
-  const [me, setMe] = useState<MeResponse | null>(null);
 
+  const [mode, setMode] = useState<"login" | "bootstrap">("login");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
@@ -60,40 +55,30 @@ export function LandingPage() {
     fetchReadiness()
       .then((r) => active && setReadiness(r))
       .catch(() => {});
-
-    const existing = getStoredToken();
-    if (existing) {
-      fetchMe(existing)
-        .then((profile) => active && setMe(profile))
-        .catch(() => setStoredToken(null));
-    }
     return () => {
       active = false;
     };
   }, []);
 
-  async function handleLogin(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setAuthError(null);
     setSubmitting(true);
     try {
-      const res = await login(email.trim(), password);
-      setStoredToken(res.access_token);
-      const profile = await fetchMe(res.access_token);
-      setMe(profile);
+      const profile =
+        mode === "login"
+          ? await signIn(email, password)
+          : await registerFirstAdmin(email, fullName, password);
       setPassword("");
+      const dest = primaryPortalPath(profile);
+      if (dest !== "/") {
+        navigate(dest);
+      }
     } catch (err: unknown) {
-      setAuthError(err instanceof Error ? err.message : "Sign in failed");
+      setAuthError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
       setSubmitting(false);
     }
-  }
-
-  async function handleLogout() {
-    const token = getStoredToken();
-    if (token) await logout(token);
-    setStoredToken(null);
-    setMe(null);
   }
 
   const profileLabel = health
@@ -101,9 +86,14 @@ export function LandingPage() {
     : "Campus LAN";
   const isReady = readiness?.status === "ready";
 
+  const hasOrganizer = Boolean(
+    me?.memberships.some((m) => m.role === "organizer" || m.role === "tenant_admin")
+  );
+  const hasCandidate = Boolean(me?.memberships.some((m) => m.role === "candidate"));
+
   return (
     <div className="min-h-screen flex flex-col bg-canvas text-ink transition-colors duration-200">
-      {/* Unified Neutral + Emerald Hero (light & dark twin) */}
+      {/* Unified Neutral + Emerald Hero */}
       <section
         className="relative overflow-hidden border-b border-subtle text-on-brand"
         style={{
@@ -111,12 +101,11 @@ export function LandingPage() {
             "linear-gradient(135deg, var(--brand-gradient-start) 0%, var(--brand-gradient-end) 100%)",
         }}
       >
-        {/* Subtle emerald ambient glow in both light and dark mode */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -top-24 left-1/4 h-[420px] w-[620px] rounded-full bg-emerald-500/10 blur-3xl dark:bg-emerald-500/12"
         />
-        {/* Subtle geometric desk/laptop vector art (adapts via currentColor) */}
+
         <svg
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 h-full w-full text-ink opacity-[0.06] dark:text-white dark:opacity-[0.11]"
@@ -155,9 +144,9 @@ export function LandingPage() {
 
         {/* Top Navigation */}
         <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-6 sm:px-8">
-          <a href="#" className="text-2xl font-extrabold tracking-tight text-ink">
+          <Link to="/" className="text-2xl font-extrabold tracking-tight text-ink">
             LANCAST<span className="text-accent">.</span>
-          </a>
+          </Link>
 
           <nav className="hidden items-center gap-8 text-sm font-medium text-ink-secondary md:flex">
             <a href="#why-lancast" className="transition hover:text-ink">
@@ -189,17 +178,12 @@ export function LandingPage() {
             >
               {theme === "light" ? (
                 <>
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                  </svg>
+                  <Moon className="h-3.5 w-3.5" />
                   Dark
                 </>
               ) : (
                 <>
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="4" />
-                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-                  </svg>
+                  <Sun className="h-3.5 w-3.5" />
                   Light
                 </>
               )}
@@ -223,12 +207,13 @@ export function LandingPage() {
               zero client Internet dependency.
             </p>
             <div className="flex flex-wrap items-center gap-3.5">
-              <a
-                href="#portal-signin"
-                className="inline-flex items-center justify-center rounded-full bg-accent px-8 py-3.5 text-sm font-bold text-on-accent shadow-lg shadow-emerald-950/15 transition hover:bg-accent-hover"
+              <Link
+                to={me ? primaryPortalPath(me) : "/#portal-signin"}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-accent px-8 py-3.5 text-sm font-bold text-on-accent shadow-lg shadow-emerald-950/15 transition hover:bg-accent-hover"
               >
-                Explore Workspace
-              </a>
+                {me ? "Open Workspace" : "Explore Workspace"}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
               <a
                 href="/api/docs"
                 className="inline-flex items-center justify-center rounded-full border border-strong bg-surface px-7 py-3.5 text-sm font-semibold text-ink transition hover:bg-elevated"
@@ -249,40 +234,104 @@ export function LandingPage() {
                   <h2 className="mb-1 text-xl font-extrabold tracking-tight">{me.user.full_name}</h2>
                   <p className="mb-5 text-sm text-ink-muted">{me.user.email}</p>
 
-                  <div className="mb-6 rounded-xl border border-subtle bg-elevated p-4 text-sm">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-ink-secondary">Platform Admin</span>
-                      <span className="font-bold text-ink">
-                        {me.user.is_platform_admin ? "Yes" : "No"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-ink-secondary">Tenant Memberships</span>
-                      <span className="font-bold text-brand-text">{me.memberships.length}</span>
-                    </div>
+                  <div className="mb-5 space-y-2">
+                    {me.user.is_platform_admin && (
+                      <Link
+                        to="/admin"
+                        className="flex items-center justify-between rounded-xl border border-subtle bg-elevated px-4 py-3 text-sm font-bold text-ink transition hover:border-accent"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Shield className="h-4 w-4 text-accent-text" /> Platform &amp; Tenants
+                        </span>
+                        <ArrowRight className="h-4 w-4 text-ink-muted" />
+                      </Link>
+                    )}
+                    {hasOrganizer && (
+                      <Link
+                        to="/organizer"
+                        className="flex items-center justify-between rounded-xl border border-subtle bg-elevated px-4 py-3 text-sm font-bold text-ink transition hover:border-accent"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <ClipboardList className="h-4 w-4 text-accent-text" /> Organizer Portal
+                        </span>
+                        <ArrowRight className="h-4 w-4 text-ink-muted" />
+                      </Link>
+                    )}
+                    {hasCandidate && (
+                      <Link
+                        to="/candidate"
+                        className="flex items-center justify-between rounded-xl border border-subtle bg-elevated px-4 py-3 text-sm font-bold text-ink transition hover:border-accent"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <BookOpen className="h-4 w-4 text-accent-text" /> Candidate Assessments
+                        </span>
+                        <ArrowRight className="h-4 w-4 text-ink-muted" />
+                      </Link>
+                    )}
+                    {!me.user.is_platform_admin && me.memberships.length === 0 && (
+                      <p className="rounded-xl bg-elevated p-3 text-xs text-ink-secondary">
+                        You do not belong to any tenant yet. Ask an administrator to enroll you.
+                      </p>
+                    )}
                   </div>
 
                   <button
                     type="button"
-                    onClick={handleLogout}
+                    onClick={() => void signOut()}
                     className="w-full cursor-pointer rounded-full border border-strong bg-surface px-5 py-3 text-sm font-bold text-ink transition hover:bg-elevated"
                   >
                     Sign Out
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div>
-                    <p className="mb-1 text-xs font-bold uppercase tracking-wider text-accent-text">
-                      Local Authentication
-                    </p>
-                    <h2 className="text-xl font-extrabold tracking-tight text-ink">
-                      Sign in to LANCAST
-                    </h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="mb-1 text-xs font-bold uppercase tracking-wider text-accent-text">
+                        {mode === "login" ? "Local Authentication" : "First-Run Setup"}
+                      </p>
+                      <h2 className="text-xl font-extrabold tracking-tight text-ink">
+                        {mode === "login" ? "Sign in to LANCAST" : "Bootstrap Admin"}
+                      </h2>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthError(null);
+                        setMode((m) => (m === "login" ? "bootstrap" : "login"));
+                      }}
+                      className="cursor-pointer rounded-full border border-subtle bg-elevated px-3 py-1 text-[11px] font-bold text-ink-secondary transition hover:border-strong hover:text-ink"
+                    >
+                      {mode === "login" ? "First-Run Setup" : "Back to Sign In"}
+                    </button>
                   </div>
 
+                  {mode === "bootstrap" && (
+                    <div>
+                      <label
+                        htmlFor="fullName"
+                        className="mb-1.5 block text-xs font-semibold text-ink-secondary"
+                      >
+                        Full Name
+                      </label>
+                      <input
+                        id="fullName"
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Platform Administrator"
+                        className="w-full rounded-xl border border-strong bg-input px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                      />
+                    </div>
+                  )}
+
                   <div>
-                    <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-ink-secondary">
+                    <label
+                      htmlFor="email"
+                      className="mb-1.5 block text-xs font-semibold text-ink-secondary"
+                    >
                       Campus Email
                     </label>
                     <input
@@ -292,22 +341,26 @@ export function LandingPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="organizer@cse.campus.edu"
-                      className="w-full rounded-xl border border-strong bg-input px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      className="w-full rounded-xl border border-strong bg-input px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="password" className="mb-1.5 block text-xs font-semibold text-ink-secondary">
-                      Password
+                    <label
+                      htmlFor="password"
+                      className="mb-1.5 block text-xs font-semibold text-ink-secondary"
+                    >
+                      Password {mode === "bootstrap" && "(min 10 chars)"}
                     </label>
                     <input
                       id="password"
                       type="password"
                       required
+                      minLength={mode === "bootstrap" ? 10 : 1}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full rounded-xl border border-strong bg-input px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      className="w-full rounded-xl border border-strong bg-input px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
                     />
                   </div>
 
@@ -322,11 +375,17 @@ export function LandingPage() {
                     disabled={submitting}
                     className="w-full cursor-pointer rounded-full bg-accent px-5 py-3 text-sm font-bold text-on-accent shadow-md transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {submitting ? "Signing in..." : "Sign In to Portal"}
+                    {submitting
+                      ? "Authenticating..."
+                      : mode === "login"
+                        ? "Sign In to Portal"
+                        : "Create Platform Admin"}
                   </button>
 
                   <p className="pt-1 text-center text-xs text-ink-muted">
-                    Protected by local Argon2 sessions • LAN-only access
+                    {mode === "login"
+                      ? "Protected by local Argon2 sessions • LAN-only access"
+                      : "Only allowed when zero users exist in the database"}
                   </p>
                 </form>
               )}
@@ -431,7 +490,9 @@ function StatusBadge({ label, ok, pending }: { label: string; ok: boolean; pendi
   const dot = pending ? "bg-ink-muted" : ok ? "bg-accent" : "bg-danger";
 
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-bold ${styles}`}>
+    <span
+      className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-bold ${styles}`}
+    >
       <span className={`h-2 w-2 rounded-full ${dot}`} />
       {label}: {pending ? "Checking" : ok ? "Healthy" : "Unreachable"}
     </span>

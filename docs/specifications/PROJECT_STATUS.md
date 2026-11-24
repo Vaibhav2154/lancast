@@ -1,6 +1,6 @@
 # LANCAST — Project Status and Phase Tracker
 
-**Current phase:** Phase 2 — Core Assessment Platform  
+**Current phase:** Phase 3 — Infrastructure and Deployment  
 **Status:** In progress | **Last updated:** 24 November 2026
 
 ## Confirmed decisions
@@ -21,8 +21,8 @@
 |---|---|---|---|
 | 0 | Research and requirements | Complete | Six planning documents reviewed; literature gap and testbed clarified |
 | 1 | Architecture and foundation | Complete | Repo skeleton, ERD, API contracts, configuration and test foundation |
-| 2 | Assessment platform | In progress | Multi-tenant assessment lifecycle and modules work |
-| 3 | Infrastructure/deployment | Not started | Central and standalone profiles deploy reproducibly |
+| 2 | Assessment platform | Complete | Multi-tenant assessment lifecycle and modules work |
+| 3 | Infrastructure/deployment | In progress | Central and standalone profiles deploy reproducibly |
 | 4 | Monitoring/telemetry | Not started | Required metrics collected and validated |
 | 5 | Resource orchestration | Not started | Estimator, readiness, admission and scheduler tested |
 | 6 | Security orchestration | Not started | Context policies, replay controls and audit integrity tested |
@@ -66,6 +66,7 @@
 | 1.6 | 2026-11-24 | Added GitHub Actions CI workflow (`.github/workflows/ci.yml`) covering Ruff lint, Pytest, Alembic SQL check, Vite/TS build, and Compose validation |
 | 1.7 | 2026-11-24 | Verified live Docker Compose stack (`/api/ready` green, `0001_initial_schema` migrated), renamed `docs/phase-0/` to `docs/specifications/`, froze Phase 1, and started Phase 2 |
 | 2.0 | 2026-11-24 | Completed Phase 2 backend & execution worker (local Argon2/JWT auth + revocable sessions, tenant RBAC + cross-tenant audit denials, immutable assessment versions + SHA-256 digests, 5 pluggable question modules, idempotent autosave/submit, safe uploads, capsules, out-of-process Judge0 dispatcher, 68 API tests on SQLite & Postgres + 6 worker tests, zero Alembic drift, CI updated); Phase 2 frontend portals pending |
+| 2.1 | 2026-11-24 | Completed Phase 2 React + Vite + Tailwind v4 frontend portals (Auth/Bootstrap, Platform & Tenant Admin, Organizer Dashboard + 5-type Question Editor + Capsules + Results/Grading, Candidate Home + Distraction-Free Exam Runner with monotonic autosave & idempotent submit, Neutral+Emerald Light/Dark themes, 5 Vitest tests, CI updated, live Docker/Traefik verified); froze Phase 2 and started Phase 3 |
 
 ## Working rule
 A phase is not complete because code has been generated. It is complete only when acceptance criteria are demonstrated with tests, evidence and updated documentation.

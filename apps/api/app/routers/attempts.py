@@ -16,9 +16,11 @@ from app.core.deps import (
     deny,
 )
 from app.core.errors import api_error
-from app.db.models import Assessment, AssessmentEnrollment, Attempt, Membership
+from app.db.models import Assessment, AssessmentEnrollment, Attempt, Membership, Submission
 from app.schemas.attempts import (
     AttemptOut,
+    CodeRunRequest,
+    CodeRunResponse,
     MyAssessmentOut,
     ResponseSave,
     SavedResponseOut,
@@ -28,10 +30,13 @@ from app.schemas.attempts import (
 from app.services import assessments as assessment_svc
 from app.services import attempts as svc
 from app.services import uploads
+from app.services.code_runner import CodeRunner, SandboxUnavailableError, get_code_runner
 from app.services.execution_queue import get_execution_queue
+from app.services.question_modules import QuestionValidationError, get_module
 
 router = APIRouter(prefix="/api", tags=["attempts"])
 QueueDep = Annotated[ExecutionQueueContract, Depends(get_execution_queue)]
+RunnerDep = Annotated[CodeRunner, Depends(get_code_runner)]
 
 
 async def _load_attempt(
@@ -168,6 +173,22 @@ async def submit(
     )
 
 
+@router.get("/attempts/{attempt_id}/submission", response_model=SubmissionOut)
+async def get_attempt_submission(attempt: ViewableAttempt, db: DbSession) -> SubmissionOut:
+    """Fetch current evaluation status and score for a submitted attempt."""
+    submission = await db.scalar(select(Submission).where(Submission.attempt_id == attempt.id))
+    if submission is None:
+        raise api_error(404, "NOT_FOUND", "Attempt has not been submitted yet")
+    return SubmissionOut(
+        id=submission.id,
+        attempt_id=submission.attempt_id,
+        status=submission.status,
+        score=submission.score,
+        submitted_at=submission.submitted_at,
+        replayed=False,
+    )
+
+
 @router.post("/attempts/{attempt_id}/questions/{question_id}/upload", response_model=UploadOut)
 async def upload_file(
     question_id: UUID,
@@ -201,3 +222,65 @@ async def upload_file(
         size_bytes=record.size_bytes,
         sha256=record.sha256,
     )
+
+
+@router.post("/attempts/{attempt_id}/questions/{question_id}/run", response_model=CodeRunResponse)
+async def run_code(
+    question_id: UUID,
+    body: CodeRunRequest,
+    attempt: OwnedAttempt,
+    db: DbSession,
+    runner: RunnerDep,
+) -> CodeRunResponse:
+    """Run candidate code against public sample cases or custom stdin (never hidden tests)."""
+    svc.ensure_open(attempt)
+    question = await svc.get_attempt_question(db, attempt, question_id)
+    if question.question_type != "coding":
+        raise api_error(422, "NOT_CODING_QUESTION", "This question does not support code execution")
+
+    try:
+        normalized = get_module("coding").validate_response(
+            question.prompt_json,
+            {"language": body.language, "source_code": body.source_code},
+        )
+    except QuestionValidationError as exc:
+        raise api_error(422, "INVALID_RESPONSE", str(exc)) from exc
+
+    cpu_limit = float(question.hidden_eval_json.get("cpu_time_limit_sec", 2.0))
+    mem_limit = int(question.hidden_eval_json.get("memory_limit_mb", 256))
+
+    if body.custom_stdin is not None:
+        mode: str = "custom_input"
+        cases = [{"stdin": body.custom_stdin, "expected_stdout": None}]
+    else:
+        samples = question.prompt_json.get("sample_cases") or []
+        if samples:
+            mode = "sample_cases"
+            cases = [
+                {"stdin": str(c.get("stdin", "")), "expected_stdout": str(c.get("expected_stdout", ""))}
+                for c in samples
+            ]
+        else:
+            mode = "custom_input"
+            cases = [{"stdin": "", "expected_stdout": None}]
+
+    results = []
+    try:
+        for case in cases:
+            out = await runner.run_case(
+                language=normalized["language"],
+                source_code=normalized["source_code"],
+                stdin=case["stdin"],
+                expected_stdout=case["expected_stdout"],
+                cpu_time_limit_sec=cpu_limit,
+                memory_limit_mb=mem_limit,
+            )
+            results.append(out)
+    except SandboxUnavailableError as exc:
+        raise api_error(
+            503,
+            "SANDBOX_UNAVAILABLE",
+            "Code execution sandbox is unreachable. Start the Judge0 coding stack to run code.",
+        ) from exc
+
+    return CodeRunResponse(mode=mode, cases=results)

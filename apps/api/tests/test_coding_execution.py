@@ -39,7 +39,12 @@ async def test_coding_submission_is_enqueued_not_run_in_api(client, ctx, world):
 
 
 async def test_worker_result_scores_submission(client, ctx, world):
-    aid, _qids, _attempt, _res = await _submit_coding(client, world, extra_questions=[MCQ_Q])
+    aid, _qids, attempt, _res = await _submit_coding(client, world, extra_questions=[MCQ_Q])
+    before = await client.get(
+        f"/api/attempts/{attempt['id']}/submission", headers=world.a.cand
+    )
+    assert before.status_code == 200 and before.json()["status"] == "evaluating"
+
     job_id = str(ctx.queue.jobs[0].job_id)
     result = {
         "status": "completed",
@@ -53,6 +58,12 @@ async def test_worker_result_scores_submission(client, ctx, world):
         f"/api/internal/execution/jobs/{job_id}/result", json=result, headers=SECRET
     )
     assert post.status_code == 200 and post.json()["duplicate"] is False
+
+    after = await client.get(
+        f"/api/attempts/{attempt['id']}/submission", headers=world.a.cand
+    )
+    assert after.status_code == 200
+    assert after.json()["status"] == "scored" and after.json()["score"] == 5.0
 
     rows = (
         await client.get(
@@ -131,3 +142,57 @@ async def test_non_coding_submission_does_not_touch_queue(client, ctx, world):
         headers={"Idempotency-Key": "submit-key-0009", **world.a.cand},
     )
     assert ctx.queue.jobs == []
+
+
+async def test_run_code_uses_only_public_sample_cases(client, ctx, world):
+    _, qids, attempt = await live_assessment(client, world, [CODING_Q])
+    res = await client.post(
+        f"/api/attempts/{attempt['id']}/questions/{qids[0]}/run",
+        json=CODE,
+        headers=world.a.cand,
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["mode"] == "sample_cases"
+    assert len(body["cases"]) == 1
+    assert body["cases"][0]["stdin"] == "x"
+    assert body["cases"][0]["expected_stdout"] == "x"
+    assert body["cases"][0]["passed"] is True
+    assert body["cases"][0]["verdict"] == "accepted"
+    # Never touched hidden test_cases ("a", "b")
+    assert [c["stdin"] for c in ctx.runner.calls] == ["x"]
+
+
+async def test_run_code_custom_stdin_and_validation(client, ctx, world):
+    _, qids, attempt = await live_assessment(client, world, [CODING_Q, MCQ_Q])
+    url = f"/api/attempts/{attempt['id']}/questions/{qids[0]}/run"
+
+    custom = await client.post(
+        url, json={**CODE, "custom_stdin": "Hello LANCAST"}, headers=world.a.cand
+    )
+    assert custom.status_code == 200
+    assert custom.json()["mode"] == "custom_input"
+    assert custom.json()["cases"][0]["stdout"] == "Hello LANCAST"
+    assert custom.json()["cases"][0]["passed"] is None
+
+    # Disallowed language
+    bad_lang = await client.post(
+        url, json={"language": "java", "source_code": "class A {}"}, headers=world.a.cand
+    )
+    assert bad_lang.status_code == 422
+
+    # Non-coding question rejected
+    mcq_run = await client.post(
+        f"/api/attempts/{attempt['id']}/questions/{qids[1]}/run",
+        json=CODE,
+        headers=world.a.cand,
+    )
+    assert mcq_run.status_code == 422
+
+    # Foreign candidate blocked
+    assert (await client.post(url, json=CODE, headers=world.a.cand2)).status_code == 404
+
+    # Sandbox offline returns 503
+    ctx.runner.fail_with_unavailable = True
+    offline = await client.post(url, json=CODE, headers=world.a.cand)
+    assert offline.status_code == 503 and offline.json()["detail"]["code"] == "SANDBOX_UNAVAILABLE"

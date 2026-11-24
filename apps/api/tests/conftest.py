@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 os.environ.setdefault("AUTH_SECRET_KEY", "test-secret-key-0123456789abcdef")
 
-from fakes import FakeQueue
+from fakes import FakeCodeRunner, FakeQueue
 from helpers import World, build_world
 from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
@@ -19,6 +19,7 @@ from app.core.config import Settings, get_settings
 from app.db.models import Base
 from app.db.session import get_db_session
 from app.main import create_app
+from app.services.code_runner import get_code_runner
 from app.services.execution_queue import get_execution_queue
 
 # Production uses pwdlib's recommended Argon2 parameters; tests use cheap ones for speed only.
@@ -54,6 +55,7 @@ def ctx(engine, tmp_path):
     factory = async_sessionmaker(engine, expire_on_commit=False)
     app = create_app()
     queue = FakeQueue(max_depth=5)
+    runner = FakeCodeRunner()
     settings = Settings(
         environment="test",
         upload_dir=str(tmp_path / "uploads"),
@@ -68,7 +70,10 @@ def ctx(engine, tmp_path):
     app.dependency_overrides[get_db_session] = override_db
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_execution_queue] = lambda: queue
-    return SimpleNamespace(app=app, factory=factory, queue=queue, settings=settings)
+    app.dependency_overrides[get_code_runner] = lambda: runner
+    return SimpleNamespace(
+        app=app, factory=factory, queue=queue, runner=runner, settings=settings
+    )
 
 
 @pytest_asyncio.fixture

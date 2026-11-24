@@ -2,10 +2,11 @@
 #
 # Usage:  docker compose -f docker-compose.yml -f docker-compose.coding.yml up -d --build
 #
-# NOTE: not exercised in CI. Judge0 workers need `privileged: true` for `isolate`, and Judge0 1.13
-# expects cgroup v1 (hosts on cgroup v2 may need `systemd.unified_cgroup_hierarchy=0`).
+# NOTE: not exercised in CI. Both judge0-server (for wait=true inline runs) and judge0-worker
+# require `privileged: true` for `isolate`. Per-process time/memory limits are enabled so
+# `isolate` runs cleanly on cgroup v2 Linux hosts without requiring cgroup v1 kernel flags.
 # Audit this isolation boundary in Phase 3 before running untrusted code on a shared host.
-# Judge0 is NOT published to the host; only the dispatcher can reach it on the internal network.
+# Judge0 is NOT published to the host; only the api and dispatcher can reach it internally.
 
 services:
   dispatcher:
@@ -30,6 +31,7 @@ services:
     image: judge0/judge0:1.13.1
     restart: unless-stopped
     command: ["./scripts/server"]
+    privileged: true # required for inline wait=true isolate runs
     environment: &judge0_env
       REDIS_HOST: judge0-redis
       POSTGRES_HOST: judge0-db
@@ -37,6 +39,8 @@ services:
       POSTGRES_USER: judge0
       POSTGRES_PASSWORD: ${JUDGE0_DB_PASSWORD:-judge0-local-password}
       ENABLE_NETWORK: "false"
+      ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT: "true"
+      ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT: "true"
       MAX_CPU_TIME_LIMIT: "10"
       MAX_MEMORY_LIMIT: "512000"
     depends_on:
