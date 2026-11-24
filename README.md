@@ -3,7 +3,7 @@
 
 LANCAST is a self-hosted, LAN-first assessment platform for colleges, departments, faculty groups, and student organizations. It combines multi-tenant assessment management with two research subsystems: **Capacity-Aware Adaptive Resource Orchestration** and **Assessment-Aware Security and Integrity Orchestration**.
 
-> **Status:** Phase 1 — Architecture and Project Foundation (Phase 0 frozen)  
+> **Status:** Phase 2 — Core Assessment Platform (Phases 0 & 1 complete)  
 > **Development:** Solo developer, phase-driven  
 > **Deployment:** Centralized campus deployment and standalone single-machine deployment
 
@@ -239,7 +239,7 @@ Standalone has a single-machine resource and failure boundary. Capacity/admissio
 
 ## 8. Technology Stack
 
-Core stack choices are recorded in [06_TECHNOLOGY_DECISIONS.md](docs/phase-0/06_TECHNOLOGY_DECISIONS.md) and will be validated in Phase 1.
+Core stack choices are recorded in [06_TECHNOLOGY_DECISIONS.md](docs/specifications/06_TECHNOLOGY_DECISIONS.md) and formalized in [docs/architecture/decisions/](docs/architecture/decisions/).
 
 | Layer | Technology |
 |---|---|
@@ -326,9 +326,9 @@ lancast/
 │   ├── load/
 │   └── resilience/
 ├── docs/
-│   ├── phase-0/
-│   ├── research/
+│   ├── specifications/
 │   ├── architecture/
+│   ├── research/
 │   ├── security/
 │   ├── deployment/
 │   └── user-guides/
@@ -547,13 +547,11 @@ Preserve hardware/network manifests, software versions, commit IDs, configs, wor
 
 ## 13. Getting Started
 
-**Important:** LANCAST is currently in Phase 0. The commands below describe the intended workflow and will be updated when Phase 1 establishes the actual project configuration. They do not imply that the application is currently runnable.
-
-### Prerequisites (proposed)
+### Prerequisites
 - Git
 - Docker Engine and Docker Compose plugin
-- Python version pinned during Phase 1
-- Node.js version pinned during Phase 1
+- Python 3.12+ (for local backend development/tests)
+- Node.js 22+ (for local frontend development/builds)
 
 ### Clone
 ```bash
@@ -562,19 +560,33 @@ cd lancast
 ```
 
 ### Configure
-When `.env.example` is available:
+Copy the environment template and replace placeholder passwords/secrets:
 ```bash
 cp .env.example .env
 ```
-Populate local values. Never commit `.env`.
+Never commit `.env`. Avoid unescaped `$` characters in `.env` passwords (or escape as `$$` for Docker Compose).
 
-### Start
-The exact Compose command/configuration will be finalized in Phase 1. Intended workflow:
+### Start (Standalone Docker Compose)
 ```bash
-docker compose up -d
+docker compose up -d --build
+docker compose exec api alembic upgrade head
 ```
 
-Test commands will be added once test tooling is established.
+Open:
+- **Web UI:** `http://localhost/`
+- **API Health:** `http://localhost/api/health`
+- **API Readiness:** `http://localhost/api/ready`
+- **OpenAPI Docs:** `http://localhost/api/docs`
+
+### Run Tests & Lint Locally
+```bash
+# Backend (from apps/api)
+ruff check app tests alembic
+pytest -v
+
+# Frontend (from apps/web)
+npm install && npm run build
+```
 
 ## 14. Configuration
 
@@ -605,16 +617,22 @@ A feature is complete only when implementation, tests, authorization/failure beh
 
 ## 16. Documentation
 
-### Phase 0 Planning Package (current)
-- [01_PROJECT_SRS.md](docs/phase-0/01_PROJECT_SRS.md) — functional and non-functional requirements.
-- [02_RESEARCH_SPECIFICATION.md](docs/phase-0/02_RESEARCH_SPECIFICATION.md) — research questions, hypotheses, and contributions.
-- [03_SYSTEM_ARCHITECTURE.md](docs/phase-0/03_SYSTEM_ARCHITECTURE.md) — logical architecture and deployment models.
-- [04_THREAT_MODEL.md](docs/phase-0/04_THREAT_MODEL.md) — assets, trust boundaries, threats, and mitigations.
-- [05_EXPERIMENT_PLAN.md](docs/phase-0/05_EXPERIMENT_PLAN.md) — baselines, workloads, metrics, and analysis.
-- [06_TECHNOLOGY_DECISIONS.md](docs/phase-0/06_TECHNOLOGY_DECISIONS.md) — stack decisions and open ADRs.
-- [07_LITERATURE_REVIEW.md](docs/phase-0/07_LITERATURE_REVIEW.md) — focused literature review and gap analysis across all three research pillars.
-- [08_TESTBED_MANIFEST.md](docs/phase-0/08_TESTBED_MANIFEST.md) — local dev/standalone hardware manifest and central testbed template.
-- [PROJECT_STATUS.md](docs/phase-0/PROJECT_STATUS.md) — phase tracker, confirmed decisions, and open items.
+### Specifications & Planning (`docs/specifications/`)
+- [01_PROJECT_SRS.md](docs/specifications/01_PROJECT_SRS.md) — functional and non-functional requirements.
+- [02_RESEARCH_SPECIFICATION.md](docs/specifications/02_RESEARCH_SPECIFICATION.md) — research questions, hypotheses, and contributions.
+- [03_SYSTEM_ARCHITECTURE.md](docs/specifications/03_SYSTEM_ARCHITECTURE.md) — logical architecture and deployment models.
+- [04_THREAT_MODEL.md](docs/specifications/04_THREAT_MODEL.md) — assets, trust boundaries, threats, and mitigations.
+- [05_EXPERIMENT_PLAN.md](docs/specifications/05_EXPERIMENT_PLAN.md) — baselines, workloads, metrics, and analysis.
+- [06_TECHNOLOGY_DECISIONS.md](docs/specifications/06_TECHNOLOGY_DECISIONS.md) — stack decisions and open ADRs.
+- [07_LITERATURE_REVIEW.md](docs/specifications/07_LITERATURE_REVIEW.md) — focused literature review and gap analysis across all three research pillars.
+- [08_TESTBED_MANIFEST.md](docs/specifications/08_TESTBED_MANIFEST.md) — local dev/standalone hardware manifest and central testbed template.
+- [PROJECT_STATUS.md](docs/specifications/PROJECT_STATUS.md) — phase tracker, confirmed decisions, and open items.
+
+### Architecture & ADRs (`docs/architecture/`)
+- [data-model.md](docs/architecture/data-model.md) — core ERD, tables, and integrity invariants.
+- [ADR-001-stack-and-topology.md](docs/architecture/decisions/ADR-001-stack-and-topology.md) — Traefik, React/Vite SPA, FastAPI modular monolith, Redis, and Judge0.
+- [ADR-002-auth-and-database.md](docs/architecture/decisions/ADR-002-auth-and-database.md) — local PostgreSQL + local FastAPI auth, portable `DATABASE_URL`.
+- [ADR-003-audit-signing-and-tls.md](docs/architecture/decisions/ADR-003-audit-signing-and-tls.md) — Traefik LAN TLS and Ed25519 signed audit checkpoints.
 
 ### Target Documentation Layout
 Maintain documentation alongside implementation:
@@ -658,7 +676,7 @@ For every phase:
 7. **Freeze:** complete the phase only after exit criteria are satisfied.
 
 Rules:
-- Maintain [docs/phase-0/PROJECT_STATUS.md](docs/phase-0/PROJECT_STATUS.md).
+- Maintain [docs/specifications/PROJECT_STATUS.md](docs/specifications/PROJECT_STATUS.md).
 - Record significant decisions as Architecture Decision Records.
 - Keep research algorithms independent from UI code.
 - Avoid infrastructure dependencies without a clear need.
@@ -670,13 +688,13 @@ Rules:
 
 ## 18. Current Status
 
-**Current phase: Phase 1 — Architecture and Project Foundation**
+**Current phase: Phase 2 — Core Assessment Platform**
 
 | Phase | Status |
 |---|---|
 | 0 — Research and requirements | Complete |
-| 1 — Architecture and foundation | In progress |
-| 2 — Core assessment platform | Not started |
+| 1 — Architecture and foundation | Complete |
+| 2 — Core assessment platform | In progress |
 | 3 — Infrastructure and deployment | Not started |
 | 4 — Monitoring and telemetry | Not started |
 | 5 — Resource orchestration | Not started |
@@ -685,7 +703,7 @@ Rules:
 | 8 — Experimental evaluation | Not started |
 | 9 — Research and finalization | Not started |
 
-See [docs/phase-0/PROJECT_STATUS.md](docs/phase-0/PROJECT_STATUS.md) and the Phase 0 documents in `docs/phase-0/` for detailed progress and open decisions.
+See [docs/specifications/PROJECT_STATUS.md](docs/specifications/PROJECT_STATUS.md) and [docs/specifications/](docs/specifications/) for detailed progress and open decisions.
 
 ## 19. Limitations
 

@@ -1,6 +1,6 @@
-# LANCAST — Phase 0 Planning Package
+# LANCAST — Specifications & Planning Package
 
-This directory contains the Phase 0 research, requirements, architecture, security, evaluation, and testbed specifications for **LANCAST**.
+This directory contains the foundational research, requirements, architecture, security, evaluation, and testbed specifications for **LANCAST** (established in Phase 0 and maintained across phases).
 
 ## Documents
 1. [01_PROJECT_SRS.md](01_PROJECT_SRS.md) — Functional and non-functional requirements.

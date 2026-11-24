@@ -1,6 +1,6 @@
 # LANCAST — Project Status and Phase Tracker
 
-**Current phase:** Phase 1 — Architecture and Project Foundation  
+**Current phase:** Phase 2 — Core Assessment Platform  
 **Status:** In progress | **Last updated:** 24 November 2026
 
 ## Confirmed decisions
@@ -20,8 +20,8 @@
 | Phase | Name | Status | Exit condition |
 |---|---|---|---|
 | 0 | Research and requirements | Complete | Six planning documents reviewed; literature gap and testbed clarified |
-| 1 | Architecture and foundation | In progress | Repo skeleton, ERD, API contracts, configuration and test foundation |
-| 2 | Assessment platform | Not started | Multi-tenant assessment lifecycle and modules work |
+| 1 | Architecture and foundation | Complete | Repo skeleton, ERD, API contracts, configuration and test foundation |
+| 2 | Assessment platform | In progress | Multi-tenant assessment lifecycle and modules work |
 | 3 | Infrastructure/deployment | Not started | Central and standalone profiles deploy reproducibly |
 | 4 | Monitoring/telemetry | Not started | Required metrics collected and validated |
 | 5 | Resource orchestration | Not started | Estimator, readiness, admission and scheduler tested |
@@ -64,6 +64,7 @@
 | 1.4 | 2026-11-24 | Phase 0 approved and frozen; started Phase 1 (Architecture and Project Foundation) |
 | 1.5 | 2026-11-24 | Scaffolded Phase 1 foundation: ERD, ADR-001..003, FastAPI modular monolith + 12-table Alembic schema + Pytest suite (7/7 passing), React/Vite SPA + nginx, Traefik gateway, and Docker Compose |
 | 1.6 | 2026-11-24 | Added GitHub Actions CI workflow (`.github/workflows/ci.yml`) covering Ruff lint, Pytest, Alembic SQL check, Vite/TS build, and Compose validation |
+| 1.7 | 2026-11-24 | Verified live Docker Compose stack (`/api/ready` green, `0001_initial_schema` migrated), renamed `docs/phase-0/` to `docs/specifications/`, froze Phase 1, and started Phase 2 |
 
 ## Working rule
 A phase is not complete because code has been generated. It is complete only when acceptance criteria are demonstrated with tests, evidence and updated documentation.
