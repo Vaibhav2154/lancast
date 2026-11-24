@@ -1,7 +1,7 @@
 # LANCAST — Project Status and Phase Tracker
 
-**Current phase:** Phase 0 — Research and Requirements Finalization  
-**Status:** In progress | **Last updated:** 23 November 2026
+**Current phase:** Phase 1 — Architecture and Project Foundation  
+**Status:** In progress | **Last updated:** 24 November 2026
 
 ## Confirmed decisions
 - [x] Project name: LANCAST.
@@ -19,8 +19,8 @@
 ## Phase tracker
 | Phase | Name | Status | Exit condition |
 |---|---|---|---|
-| 0 | Research and requirements | In progress | Six planning documents reviewed; literature gap and testbed clarified |
-| 1 | Architecture and foundation | Not started | Repo skeleton, ERD, API contracts, configuration and test foundation |
+| 0 | Research and requirements | Complete | Six planning documents reviewed; literature gap and testbed clarified |
+| 1 | Architecture and foundation | In progress | Repo skeleton, ERD, API contracts, configuration and test foundation |
 | 2 | Assessment platform | Not started | Multi-tenant assessment lifecycle and modules work |
 | 3 | Infrastructure/deployment | Not started | Central and standalone profiles deploy reproducibly |
 | 4 | Monitoring/telemetry | Not started | Required metrics collected and validated |
@@ -31,16 +31,16 @@
 | 9 | Research/finalization | Not started | Manuscript, docs and demonstration ready |
 
 ## Phase 0 checklist
-- [ ] Review/approve SRS.
-- [ ] Review/approve research specification.
-- [ ] Review architecture and deployment topologies.
-- [ ] Review threat model.
-- [ ] Review experiment plan.
-- [ ] Review technology decisions.
+- [x] Review/approve SRS.
+- [x] Review/approve research specification.
+- [x] Review architecture and deployment topologies.
+- [x] Review threat model.
+- [x] Review experiment plan.
+- [x] Review technology decisions.
 - [x] Conduct focused literature review with verified sources (`07_LITERATURE_REVIEW.md`; full-PDF verification of provisional papers tracked for manuscript phase).
 - [x] Record actual development/test hardware and LAN topology (`08_TESTBED_MANIFEST.md`).
 - [x] Resolve decisions blocking Phase 1 (`O-01`, `O-02`, `O-04`, `O-05`, `O-06`, `O-07`).
-- [ ] Freeze Phase 0 and record approval.
+- [x] Freeze Phase 0 and record approval (24 November 2026).
 
 ## Open decisions
 | ID | Decision | Status / Resolution |
@@ -61,6 +61,9 @@
 | 1.1 | 2026-11-23 | Locked in Traefik + React SPA (nginx) + FastAPI pool + Judge0 topology; confirmed local PostgreSQL + local FastAPI auth by default with optional external `DATABASE_URL` |
 | 1.2 | 2026-11-24 | Added focused literature review and gap analysis (`07_LITERATURE_REVIEW.md`) integrating domain PDF papers with resource QoS, Zero Trust/context-aware access control, and tamper-evident logging literature |
 | 1.3 | 2026-11-24 | Recorded local dev/standalone testbed manifest (`08_TESTBED_MANIFEST.md`), populated `docs/phase-0/README.md`, and resolved Phase 1 blocking decisions (`O-01`, `O-04`, `O-05`, `O-06`, `O-07`) |
+| 1.4 | 2026-11-24 | Phase 0 approved and frozen; started Phase 1 (Architecture and Project Foundation) |
+| 1.5 | 2026-11-24 | Scaffolded Phase 1 foundation: ERD, ADR-001..003, FastAPI modular monolith + 12-table Alembic schema + Pytest suite (7/7 passing), React/Vite SPA + nginx, Traefik gateway, and Docker Compose |
+| 1.6 | 2026-11-24 | Added GitHub Actions CI workflow (`.github/workflows/ci.yml`) covering Ruff lint, Pytest, Alembic SQL check, Vite/TS build, and Compose validation |
 
 ## Working rule
 A phase is not complete because code has been generated. It is complete only when acceptance criteria are demonstrated with tests, evidence and updated documentation.

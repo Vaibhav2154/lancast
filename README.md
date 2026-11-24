@@ -3,7 +3,7 @@
 
 LANCAST is a self-hosted, LAN-first assessment platform for colleges, departments, faculty groups, and student organizations. It combines multi-tenant assessment management with two research subsystems: **Capacity-Aware Adaptive Resource Orchestration** and **Assessment-Aware Security and Integrity Orchestration**.
 
-> **Status:** Phase 0 — Research and Requirements Finalization  
+> **Status:** Phase 1 — Architecture and Project Foundation (Phase 0 frozen)  
 > **Development:** Solo developer, phase-driven  
 > **Deployment:** Centralized campus deployment and standalone single-machine deployment
 
@@ -670,12 +670,12 @@ Rules:
 
 ## 18. Current Status
 
-**Current phase: Phase 0 — Research and Requirements Finalization**
+**Current phase: Phase 1 — Architecture and Project Foundation**
 
 | Phase | Status |
 |---|---|
-| 0 — Research and requirements | In progress |
-| 1 — Architecture and foundation | Not started |
+| 0 — Research and requirements | Complete |
+| 1 — Architecture and foundation | In progress |
 | 2 — Core assessment platform | Not started |
 | 3 — Infrastructure and deployment | Not started |
 | 4 — Monitoring and telemetry | Not started |
