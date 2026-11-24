@@ -1,8 +1,8 @@
 import httpx
 import pytest
 
-from app.api.routes.health import get_db_checker, get_redis_checker
 from app.main import create_app
+from app.routers.health import get_db_checker, get_redis_checker
 
 
 @pytest.mark.asyncio
