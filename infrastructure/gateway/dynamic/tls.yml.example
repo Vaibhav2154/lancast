@@ -1,0 +1,9 @@
+# Optional LAN TLS configuration (ADR-003).
+# To enable HTTPS on campus LAN without Internet/ACME:
+# 1. Generate a private-CA cert (e.g., via mkcert or campus IT CA) into infrastructure/gateway/certs/.
+# 2. Copy this file to tls.yml and add `websecure` + `tls: {}` to the routers in routes.yml.
+
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/lancast.crt
+      keyFile: /etc/traefik/certs/lancast.key

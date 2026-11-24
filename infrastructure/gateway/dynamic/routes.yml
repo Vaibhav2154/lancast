@@ -1,0 +1,32 @@
+http:
+  routers:
+    api-router:
+      rule: "PathPrefix(`/api`)"
+      entryPoints:
+        - web
+      service: lancast-api
+      priority: 100
+
+    web-router:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - web
+      service: lancast-web
+      priority: 1
+
+  services:
+    lancast-api:
+      loadBalancer:
+        passHostHeader: true
+        healthCheck:
+          path: /api/health
+          interval: 10s
+          timeout: 3s
+        servers:
+          - url: "http://api:8000"
+
+    lancast-web:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://web:80"
