@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* LANCAST Design System — Light (default) & Dark Theme Tokens */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg-canvas: #F8FAFC;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #F1F5F9;
+  --bg-input: #F8FAFC;
+  --bg-editor: #0F172A;
+
+  /* Borders */
+  --border-subtle: #E2E8F0;
+  --border-strong: #CBD5E1;
+
+  /* Brand — Cobalt Blue */
+  --brand-blue: #0E4AEF;
+  --brand-blue-hover: #0935C8;
+  --brand-gradient-start: #0935C8;
+  --brand-gradient-end: #0E4AEF;
+  --brand-blue-soft: #EEF4FF;
+  --brand-blue-text: #0E4AEF;
+
+  /* Accent — Emerald Green */
+  --accent-green: #0E9F58;
+  --accent-green-hover: #0B874A;
+  --accent-green-soft: #DCFCE7;
+  --accent-green-border: #86EFAC;
+  --accent-green-text: #15803D;
+
+  /* Typography */
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --text-on-brand: #FFFFFF;
+  --text-on-accent: #FFFFFF;
+
+  /* Status */
+  --status-warn: #B45309;
+  --status-warn-soft: #FEF3C7;
+  --status-danger: #DC2626;
+  --status-danger-soft: #FEE2E2;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg-canvas: #0B1120;
+  --bg-surface: #111827;
+  --bg-elevated: #1E293B;
+  --bg-input: #1E293B;
+  --bg-editor: #090E1A;
+
+  /* Borders */
+  --border-subtle: #1F2937;
+  --border-strong: #334155;
+
+  /* Brand — Cobalt Blue */
+  --brand-blue: #2563EB;
+  --brand-blue-hover: #1D4ED8;
+  --brand-gradient-start: #0B2A8F;
+  --brand-gradient-end: #1D4ED8;
+  --brand-blue-soft: rgba(37, 99, 235, 0.16);
+  --brand-blue-text: #60A5FA;
+
+  /* Accent — Emerald Green */
+  --accent-green: #10B981;
+  --accent-green-hover: #059669;
+  --accent-green-soft: rgba(16, 185, 129, 0.16);
+  --accent-green-border: rgba(52, 211, 153, 0.4);
+  --accent-green-text: #34D399;
+
+  /* Typography */
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --text-on-brand: #FFFFFF;
+  --text-on-accent: #042F2E;
+
+  /* Status */
+  --status-warn: #FBBF24;
+  --status-warn-soft: rgba(245, 158, 11, 0.15);
+  --status-danger: #F87171;
+  --status-danger-soft: rgba(239, 68, 68, 0.15);
+}
+
+/* Expose tokens as Tailwind v4 utilities (e.g., bg-canvas, bg-brand, bg-accent, text-ink) */
+@theme inline {
+  --color-canvas: var(--bg-canvas);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+  --color-input: var(--bg-input);
+  --color-editor: var(--bg-editor);
+
+  --color-subtle: var(--border-subtle);
+  --color-strong: var(--border-strong);
+
+  --color-brand: var(--brand-blue);
+  --color-brand-hover: var(--brand-blue-hover);
+  --color-brand-soft: var(--brand-blue-soft);
+  --color-brand-text: var(--brand-blue-text);
+
+  --color-accent: var(--accent-green);
+  --color-accent-hover: var(--accent-green-hover);
+  --color-accent-soft: var(--accent-green-soft);
+  --color-accent-border: var(--accent-green-border);
+  --color-accent-text: var(--accent-green-text);
+
+  --color-ink: var(--text-primary);
+  --color-ink-secondary: var(--text-secondary);
+  --color-ink-muted: var(--text-muted);
+  --color-on-brand: var(--text-on-brand);
+  --color-on-accent: var(--text-on-accent);
+
+  --color-warn: var(--status-warn);
+  --color-warn-soft: var(--status-warn-soft);
+  --color-danger: var(--status-danger);
+  --color-danger-soft: var(--status-danger-soft);
+
+  --font-sans: "Plus Jakarta Sans", "Poppins", "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-canvas text-ink font-sans antialiased min-h-screen;
+  }
+}
