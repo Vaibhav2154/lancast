@@ -1,5 +1,22 @@
 http:
+  middlewares:
+    # /api/internal is for execution workers on the internal Docker network only.
+    # Block it from every browser/LAN client at the gateway (defense in depth; T11, T19).
+    block-internal:
+      ipAllowList:
+        sourceRange:
+          - "127.0.0.1/32"
+
   routers:
+    api-internal-block:
+      rule: "PathPrefix(`/api/internal`)"
+      entryPoints:
+        - web
+      service: lancast-api
+      middlewares:
+        - block-internal
+      priority: 200
+
     api-router:
       rule: "PathPrefix(`/api`)"
       entryPoints:

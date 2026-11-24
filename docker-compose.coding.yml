@@ -1,0 +1,79 @@
+# Optional coding-assessment stack: execution dispatcher + Judge0 (isolate sandbox).
+#
+# Usage:  docker compose -f docker-compose.yml -f docker-compose.coding.yml up -d --build
+#
+# NOTE: not exercised in CI. Judge0 workers need `privileged: true` for `isolate`, and Judge0 1.13
+# expects cgroup v1 (hosts on cgroup v2 may need `systemd.unified_cgroup_hierarchy=0`).
+# Audit this isolation boundary in Phase 3 before running untrusted code on a shared host.
+# Judge0 is NOT published to the host; only the dispatcher can reach it on the internal network.
+
+services:
+  dispatcher:
+    build:
+      context: ./execution
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      API_BASE_URL: http://api:8000
+      WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET:-dev-only-worker-secret-change-me}
+      JUDGE0_URL: http://judge0-server:2358
+      WORKER_ID: dispatcher-1
+    depends_on:
+      - api
+      - redis
+      - judge0-server
+    networks:
+      - lancast_internal
+
+  judge0-server:
+    image: judge0/judge0:1.13.1
+    restart: unless-stopped
+    command: ["./scripts/server"]
+    environment: &judge0_env
+      REDIS_HOST: judge0-redis
+      POSTGRES_HOST: judge0-db
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: ${JUDGE0_DB_PASSWORD:-judge0-local-password}
+      ENABLE_NETWORK: "false"
+      MAX_CPU_TIME_LIMIT: "10"
+      MAX_MEMORY_LIMIT: "512000"
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    networks:
+      - lancast_internal
+
+  judge0-worker:
+    image: judge0/judge0:1.13.1
+    restart: unless-stopped
+    command: ["./scripts/workers"]
+    privileged: true # required by isolate; see note above
+    environment: *judge0_env
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    networks:
+      - lancast_internal
+
+  judge0-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: ${JUDGE0_DB_PASSWORD:-judge0-local-password}
+    volumes:
+      - judge0_db_data:/var/lib/postgresql/data
+    networks:
+      - lancast_internal
+
+  judge0-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - lancast_internal
+
+volumes:
+  judge0_db_data:

@@ -54,6 +54,18 @@ class ExecutionJobContract(BaseModel):
     memory_limit_mb: int = Field(default=256, ge=32, le=2048)
 
 
+class CodeTestCase(BaseModel):
+    stdin: str = ""
+    expected_stdout: str
+
+
+class ExecutionJobPayload(ExecutionJobContract):
+    """Full job message placed on the bounded queue for an execution worker."""
+
+    source_code: str
+    test_cases: list[CodeTestCase]
+
+
 class SchedulingDecision(BaseModel):
     job_id: UUID
     worker_id: str
@@ -83,5 +95,7 @@ class ExecutionQueueContract(Protocol):
     async def enqueue(self, job: ExecutionJobContract) -> int: ...
 
     async def depth(self) -> int: ...
+
+    async def has_capacity(self, count: int) -> bool: ...
 
     async def health_check(self) -> bool: ...

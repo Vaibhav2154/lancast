@@ -6,7 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN addgroup --system lancast && adduser --system --ingroup lancast lancast
+RUN addgroup --system lancast && adduser --system --ingroup lancast lancast \
+    && mkdir -p /var/lib/lancast/uploads && chown -R lancast:lancast /var/lib/lancast
 
 COPY pyproject.toml ./
 RUN pip install --upgrade pip && pip install .

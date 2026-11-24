@@ -65,6 +65,7 @@
 | 1.5 | 2026-11-24 | Scaffolded Phase 1 foundation: ERD, ADR-001..003, FastAPI modular monolith + 12-table Alembic schema + Pytest suite (7/7 passing), React/Vite SPA + nginx, Traefik gateway, and Docker Compose |
 | 1.6 | 2026-11-24 | Added GitHub Actions CI workflow (`.github/workflows/ci.yml`) covering Ruff lint, Pytest, Alembic SQL check, Vite/TS build, and Compose validation |
 | 1.7 | 2026-11-24 | Verified live Docker Compose stack (`/api/ready` green, `0001_initial_schema` migrated), renamed `docs/phase-0/` to `docs/specifications/`, froze Phase 1, and started Phase 2 |
+| 2.0 | 2026-11-24 | Completed Phase 2 backend & execution worker (local Argon2/JWT auth + revocable sessions, tenant RBAC + cross-tenant audit denials, immutable assessment versions + SHA-256 digests, 5 pluggable question modules, idempotent autosave/submit, safe uploads, capsules, out-of-process Judge0 dispatcher, 68 API tests on SQLite & Postgres + 6 worker tests, zero Alembic drift, CI updated); Phase 2 frontend portals pending |
 
 ## Working rule
 A phase is not complete because code has been generated. It is complete only when acceptance criteria are demonstrated with tests, evidence and updated documentation.

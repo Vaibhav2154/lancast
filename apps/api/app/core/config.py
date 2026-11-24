@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,9 +29,21 @@ class Settings(BaseSettings):
     auth_secret_key: str = Field(default="dev-only-change-me-in-production", min_length=16)
     session_ttl_minutes: int = Field(default=480, ge=5, le=1440)
 
+    # Execution worker authentication (workers hold no DB credentials; T19)
+    worker_shared_secret: str = Field(default="dev-only-worker-secret-change-me", min_length=16)
+
     # Observability & safety bounds
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     execution_queue_max_depth: int = Field(default=500, ge=1, le=100000)
+
+    # File uploads (T10)
+    upload_dir: str = "/var/lib/lancast/uploads"
+    max_upload_bytes: int = Field(default=5 * 1024 * 1024, ge=1024)
+
+    # Assessment Capsule import limits (T10)
+    capsule_max_compressed_bytes: int = Field(default=5 * 1024 * 1024, ge=1024)
+    capsule_max_uncompressed_bytes: int = Field(default=20 * 1024 * 1024, ge=1024)
+    capsule_max_entries: int = Field(default=20, ge=1, le=1000)
 
     @field_validator("database_url")
     @classmethod
@@ -40,6 +52,15 @@ class Settings(BaseSettings):
         if not value.startswith(allowed):
             raise ValueError("database_url must be a PostgreSQL connection URL")
         return value
+
+    @model_validator(mode="after")
+    def forbid_placeholder_secrets_in_production(self) -> "Settings":
+        if self.environment == "production":
+            placeholders = ("dev-only", "change-me")
+            for name in ("auth_secret_key", "worker_shared_secret"):
+                if getattr(self, name).startswith(placeholders):
+                    raise ValueError(f"{name} must be set to a real secret in production")
+        return self
 
     @property
     def sync_database_url(self) -> str:
