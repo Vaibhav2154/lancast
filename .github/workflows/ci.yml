@@ -119,3 +119,14 @@ jobs:
 
       - name: Validate coding override
         run: docker compose -f docker-compose.yml -f docker-compose.coding.yml config --quiet
+
+      - name: Validate standalone profile
+        run: docker compose -f docker-compose.yml -f docker-compose.coding.yml -f infrastructure/profiles/standalone/compose.standalone.yml config --quiet
+
+      - name: Validate central server & worker profiles
+        run: |
+          docker compose -f docker-compose.yml -f infrastructure/profiles/central/compose.server.yml config --quiet
+          docker compose -f infrastructure/profiles/central/compose.worker.yml config --quiet
+
+      - name: Validate TLS gateway overlay
+        run: docker compose -f docker-compose.yml -f infrastructure/gateway/compose.tls.yml config --quiet

@@ -1,0 +1,34 @@
+# HTTPS (websecure :443) routers loaded when infrastructure/gateway/compose.tls.yml is active.
+http:
+  routers:
+    api-internal-block-tls:
+      rule: "PathPrefix(`/api/internal`)"
+      entryPoints:
+        - websecure
+      service: lancast-api
+      middlewares:
+        - block-internal
+      priority: 200
+      tls: {}
+
+    api-router-tls:
+      rule: "PathPrefix(`/api`)"
+      entryPoints:
+        - websecure
+      service: lancast-api
+      middlewares:
+        - security-headers
+        - body-limit
+        - rate-limit
+      priority: 100
+      tls: {}
+
+    web-router-tls:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - websecure
+      service: lancast-web
+      middlewares:
+        - security-headers
+      priority: 1
+      tls: {}

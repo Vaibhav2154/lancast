@@ -1,0 +1,5 @@
+# Loaded into /etc/traefik/dynamic/tls.yml when compose.tls.yml is active (ADR-003).
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/lancast.crt
+      keyFile: /etc/traefik/certs/lancast.key

@@ -1,13 +1,41 @@
 http:
   middlewares:
-    # /api/internal is for execution workers on the internal Docker network only.
-    # Block it from every browser/LAN client at the gateway (defense in depth; T11, T19).
+    # /api/internal is for execution workers only; blocked on candidate/organizer entrypoints (T11, T19).
     block-internal:
       ipAllowList:
         sourceRange:
           - "127.0.0.1/32"
 
+    security-headers:
+      headers:
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+
+    # 15 MB ceiling protects against body floods while allowing 5 MB uploads/capsules (T09).
+    body-limit:
+      buffering:
+        maxRequestBodyBytes: 15728640
+
+    # Baseline LAN flood guard per client IP (T09).
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 200
+        period: "1s"
+
   routers:
+    # Dedicated worker entrypoint (published only in Central Server profile on WORKER_BIND_IP).
+    worker-internal-router:
+      rule: "PathPrefix(`/api/internal`)"
+      entryPoints:
+        - worker
+      service: lancast-api
+      middlewares:
+        - body-limit
+      priority: 200
+
     api-internal-block:
       rule: "PathPrefix(`/api/internal`)"
       entryPoints:
@@ -22,6 +50,10 @@ http:
       entryPoints:
         - web
       service: lancast-api
+      middlewares:
+        - security-headers
+        - body-limit
+        - rate-limit
       priority: 100
 
     web-router:
@@ -29,6 +61,8 @@ http:
       entryPoints:
         - web
       service: lancast-web
+      middlewares:
+        - security-headers
       priority: 1
 
   services:

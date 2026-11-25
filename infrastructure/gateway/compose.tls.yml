@@ -1,0 +1,14 @@
+# Offline Campus LAN HTTPS Overlay (ADR-003, O-05)
+# Prerequisite: generate certs with `./infrastructure/scripts/generate-lan-certs.sh <LAN_IP> [HOSTNAME]`
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f infrastructure/gateway/compose.tls.yml up -d
+
+services:
+  traefik:
+    volumes:
+      - ./infrastructure/gateway/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./infrastructure/gateway/dynamic/routes.yml:/etc/traefik/dynamic/routes.yml:ro
+      - ./infrastructure/gateway/certs:/etc/traefik/certs:ro
+      - ./infrastructure/gateway/tls-dynamic/tls.yml:/etc/traefik/dynamic/tls.yml:ro
+      - ./infrastructure/gateway/tls-dynamic/tls-routes.yml:/etc/traefik/dynamic/tls-routes.yml:ro
