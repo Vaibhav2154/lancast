@@ -634,6 +634,7 @@ A feature is complete only when implementation, tests, authorization/failure beh
 
 ### Architecture & ADRs (`docs/architecture/`)
 - [data-model.md](docs/architecture/data-model.md) — core ERD, tables, and integrity invariants.
+- [system-diagrams.md](docs/architecture/system-diagrams.md) — high-level component interaction and detailed system architecture Mermaid diagrams.
 - [ADR-001-stack-and-topology.md](docs/architecture/decisions/ADR-001-stack-and-topology.md) — Traefik, React/Vite SPA, FastAPI modular monolith, Redis, and Judge0.
 - [ADR-002-auth-and-database.md](docs/architecture/decisions/ADR-002-auth-and-database.md) — local PostgreSQL + local FastAPI auth, portable `DATABASE_URL`.
 - [ADR-003-audit-signing-and-tls.md](docs/architecture/decisions/ADR-003-audit-signing-and-tls.md) — Traefik LAN TLS and Ed25519 signed audit checkpoints.
