@@ -15,6 +15,36 @@ export interface ReadinessInfo {
   };
 }
 
+export interface WorkerNodeInfo {
+  worker_id: string;
+  hostname: string;
+  deployment_mode: string;
+  status: "online" | "degraded" | "offline" | string;
+  judge0_ok: boolean;
+  active_jobs: number;
+  jobs_completed: number;
+  jobs_failed: number;
+  registered_at: string;
+  last_heartbeat_at: string;
+  stale: boolean;
+}
+
+export interface InfrastructureStatus {
+  deployment_profile: string;
+  environment: string;
+  app_version: string;
+  public_base_url: string;
+  dependencies: {
+    postgres: string;
+    redis: string;
+    judge0: string;
+  };
+  queue_depth: number | null;
+  dead_letter_depth: number | null;
+  worker_stale_seconds: number;
+  workers: WorkerNodeInfo[];
+}
+
 export type TenantRole = "tenant_admin" | "organizer" | "candidate";
 
 export interface AuthUser {
@@ -309,6 +339,10 @@ export async function fetchHealth(): Promise<HealthInfo> {
 export async function fetchReadiness(): Promise<ReadinessInfo> {
   const res = await fetch("/api/ready");
   return (await res.json()) as ReadinessInfo;
+}
+
+export async function getAdminInfrastructure(): Promise<InfrastructureStatus> {
+  return request<InfrastructureStatus>("/api/admin/infrastructure");
 }
 
 // Auth

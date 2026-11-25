@@ -1,12 +1,21 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Building2, Plus } from "lucide-react";
+import { Building2, Cpu, Plus, RefreshCw } from "lucide-react";
 import { AppShell } from "../components/AppShell";
+import { StatusBadge } from "../components/StatusBadge";
 import { TenantMembersPanel } from "../components/TenantMembersPanel";
-import { createTenant, listTenants, Tenant } from "../lib/api";
+import {
+  createTenant,
+  getAdminInfrastructure,
+  InfrastructureStatus,
+  listTenants,
+  Tenant,
+} from "../lib/api";
 
 export function AdminPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [infra, setInfra] = useState<InfrastructureStatus | null>(null);
+  const [infraLoading, setInfraLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -14,11 +23,22 @@ export function AdminPage() {
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
 
+  const loadInfra = useCallback(async () => {
+    setInfraLoading(true);
+    try {
+      setInfra(await getAdminInfrastructure());
+    } catch {
+      // Non-fatal: tenant administration remains usable even if telemetry fails.
+    } finally {
+      setInfraLoading(false);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const items = await listTenants();
+      const [items] = await Promise.all([listTenants(), loadInfra()]);
       setTenants(items);
       setSelectedTenant((prev) =>
         prev ? items.find((t) => t.id === prev.id) ?? items[0] ?? null : items[0] ?? null
@@ -28,7 +48,7 @@ export function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadInfra]);
 
   useEffect(() => {
     void load();
@@ -52,8 +72,128 @@ export function AdminPage() {
   }
 
   return (
-    <AppShell kicker="Platform Administration" title="Tenants & Memberships">
+    <AppShell kicker="Platform Administration" title="Tenants & Infrastructure">
       <div className="space-y-6">
+        <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-xs">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <Cpu className="h-5 w-5 text-accent-text" />
+              <div>
+                <h2 className="text-base font-extrabold text-ink">
+                  Infrastructure & Execution Workers
+                </h2>
+                <p className="text-xs text-ink-muted">
+                  Profile:{" "}
+                  <span className="font-mono font-bold text-ink">
+                    {infra?.deployment_profile ?? "..."}
+                  </span>{" "}
+                  • Environment:{" "}
+                  <span className="font-mono text-ink">{infra?.environment ?? "..."}</span>
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={infraLoading}
+              onClick={() => void loadInfra()}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-subtle bg-elevated px-3.5 py-1.5 text-xs font-bold text-ink hover:border-strong disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${infraLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+          </div>
+
+          {infra && (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="rounded-xl border border-subtle bg-elevated/50 px-4 py-3">
+                  <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+                    PostgreSQL
+                  </div>
+                  <StatusBadge status={infra.dependencies.postgres} />
+                </div>
+                <div className="rounded-xl border border-subtle bg-elevated/50 px-4 py-3">
+                  <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+                    Redis Queue
+                  </div>
+                  <StatusBadge status={infra.dependencies.redis} />
+                </div>
+                <div className="rounded-xl border border-subtle bg-elevated/50 px-4 py-3">
+                  <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+                    Judge0 Sandbox
+                  </div>
+                  <StatusBadge status={infra.dependencies.judge0} />
+                </div>
+                <div className="rounded-xl border border-subtle bg-elevated/50 px-4 py-3">
+                  <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+                    Queued Jobs
+                  </div>
+                  <div className="text-lg font-extrabold text-ink">
+                    {infra.queue_depth ?? "—"}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-subtle bg-elevated/50 px-4 py-3">
+                  <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+                    Dead-Letter Jobs
+                  </div>
+                  <div className="text-lg font-extrabold text-ink">
+                    {infra.dead_letter_depth ?? "—"}
+                  </div>
+                </div>
+              </div>
+
+              {infra.workers.length === 0 ? (
+                <p className="rounded-xl border border-subtle bg-elevated/40 px-4 py-3 text-xs text-ink-muted">
+                  No execution worker heartbeats recorded yet. Start{" "}
+                  <code className="font-mono text-ink">dispatcher</code> to register workers.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-subtle">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-subtle bg-elevated/70 font-bold uppercase tracking-wider text-ink-muted">
+                      <tr>
+                        <th className="px-4 py-2.5">Worker ID</th>
+                        <th className="px-4 py-2.5">Host</th>
+                        <th className="px-4 py-2.5">Mode</th>
+                        <th className="px-4 py-2.5">Status</th>
+                        <th className="px-4 py-2.5">Judge0</th>
+                        <th className="px-4 py-2.5">Completed / Failed</th>
+                        <th className="px-4 py-2.5">Last Heartbeat</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-subtle">
+                      {infra.workers.map((w) => (
+                        <tr key={w.worker_id} className="hover:bg-elevated/30">
+                          <td className="px-4 py-2.5 font-mono font-bold text-ink">
+                            {w.worker_id}
+                          </td>
+                          <td className="px-4 py-2.5 font-mono text-ink-secondary">
+                            {w.hostname}
+                          </td>
+                          <td className="px-4 py-2.5 text-ink-secondary">{w.deployment_mode}</td>
+                          <td className="px-4 py-2.5">
+                            <StatusBadge status={w.status} />
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <StatusBadge status={w.judge0_ok ? "ok" : "unreachable"} />
+                          </td>
+                          <td className="px-4 py-2.5 font-semibold text-ink">
+                            {w.jobs_completed} / {w.jobs_failed}
+                          </td>
+                          <td className="px-4 py-2.5 text-ink-muted">
+                            {new Date(w.last_heartbeat_at).toLocaleTimeString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-xs">
           <h2 className="mb-1 text-base font-extrabold text-ink">Create Tenant</h2>
           <p className="mb-4 text-xs text-ink-muted">

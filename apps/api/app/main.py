@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging
-from app.routers import assessments, attempts, auth, capsules, internal, tenants
+from app.routers import admin, assessments, attempts, auth, capsules, internal, tenants
 from app.routers.health import router as health_router
 
 
@@ -29,6 +29,7 @@ def create_app() -> FastAPI:
     )
 
     application.include_router(health_router)
+    application.include_router(admin.router)
     application.include_router(auth.router)
     application.include_router(tenants.router)
     application.include_router(assessments.router)

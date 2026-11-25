@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from dispatcher.sandbox import Judge0Runner, SandboxError
-from dispatcher.worker import process_job, report_result
+from dispatcher.worker import check_judge0_health, process_job, report_result, send_heartbeat
 
 JOB = {
     "job_id": "j1",
@@ -121,3 +121,24 @@ def test_report_result_sends_secret_and_stops_on_permanent_rejection():
 
     ok_client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json={})))
     assert report_result(ok_client, "http://api", "s3cret-value-0123", "j1", {}) is True
+
+
+def test_worker_heartbeat_and_judge0_health():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        if request.url.path == "/about":
+            return httpx.Response(200, json={"version": "1.13.1"})
+        if request.url.path == "/api/internal/workers/heartbeat":
+            return httpx.Response(200, json={"worker_id": "w1", "status": "online"})
+        return httpx.Response(500)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    assert check_judge0_health(client, "http://judge0:2358") is True
+    assert send_heartbeat(client, "http://api:8000", "secret-token", {"worker_id": "w1"}) is True
+    assert calls[1].headers["X-Worker-Token"] == "secret-token"
+
+    failing = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+    assert check_judge0_health(failing, "http://judge0:2358") is False
+    assert send_heartbeat(failing, "http://api:8000", "secret-token", {"worker_id": "w1"}) is False

@@ -14,6 +14,11 @@ const VARIANT_MAP: Record<string, { label: string; badge: string; dot: string }>
     badge: "bg-accent-soft text-accent-text border-accent-border",
     dot: "bg-accent",
   },
+  online: {
+    label: "Online",
+    badge: "bg-accent-soft text-accent-text border-accent-border",
+    dot: "bg-accent",
+  },
   scored: {
     label: "Scored",
     badge: "bg-accent-soft text-accent-text border-accent-border",
@@ -96,6 +101,11 @@ const VARIANT_MAP: Record<string, { label: string; badge: string; dot: string }>
   },
   unreachable: {
     label: "Unreachable",
+    badge: "bg-danger-soft text-danger border-danger/30",
+    dot: "bg-danger",
+  },
+  offline: {
+    label: "Offline",
     badge: "bg-danger-soft text-danger border-danger/30",
     dot: "bg-danger",
   },

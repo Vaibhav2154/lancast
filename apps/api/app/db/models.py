@@ -239,3 +239,21 @@ class SignedAuditCheckpoint(Base):
     signature_ed25519: Mapped[str] = mapped_column(String(256), nullable=False)
     key_id: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class WorkerNode(Base):
+    __tablename__ = "worker_nodes"
+
+    worker_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    hostname: Mapped[str] = mapped_column(String(255), nullable=False)
+    deployment_mode: Mapped[str] = mapped_column(String(32), default="standalone", nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="online", nullable=False)
+    judge0_ok: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    active_jobs: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    jobs_completed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    jobs_failed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    last_heartbeat_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False, index=True
+    )
