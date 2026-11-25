@@ -1,7 +1,7 @@
 # LANCAST — Project Status and Phase Tracker
 
-**Current phase:** Phase 3 — Infrastructure and Deployment  
-**Status:** In progress | **Last updated:** 24 November 2026
+**Current phase:** Phase 4 — Monitoring and Telemetry  
+**Status:** Not started (Phase 3 complete) | **Last updated:** 25 November 2026
 
 ## Confirmed decisions
 - [x] Project name: LANCAST.
@@ -22,7 +22,7 @@
 | 0 | Research and requirements | Complete | Six planning documents reviewed; literature gap and testbed clarified |
 | 1 | Architecture and foundation | Complete | Repo skeleton, ERD, API contracts, configuration and test foundation |
 | 2 | Assessment platform | Complete | Multi-tenant assessment lifecycle and modules work |
-| 3 | Infrastructure/deployment | In progress | Central and standalone profiles deploy reproducibly |
+| 3 | Infrastructure/deployment | Complete | Central and standalone profiles deploy reproducibly |
 | 4 | Monitoring/telemetry | Not started | Required metrics collected and validated |
 | 5 | Resource orchestration | Not started | Estimator, readiness, admission and scheduler tested |
 | 6 | Security orchestration | Not started | Context policies, replay controls and audit integrity tested |
@@ -47,7 +47,7 @@
 |---|---|---|
 | O-01 | Frontend framework | **Resolved:** React + Vite + TypeScript SPA served via nginx behind Traefik |
 | O-02 | Local identity in standalone | **Resolved:** Local FastAPI authentication backed by PostgreSQL (same in central and standalone; optional external `DATABASE_URL` does not change local auth) |
-| O-03 | Execution backend | Judge0 + `isolate` selected; audit and document isolation limits in Phase 1/3 |
+| O-03 | Execution backend | **Resolved (Phase 3):** Judge0 1.13.1 + `isolate` audited in `docs/infrastructure/judge0-isolation-audit.md` (3-network segmentation, `ENABLE_NETWORK=false`, physical `mem_limit`, cgroup v2 `RLIMIT_AS`, base64 I/O) |
 | O-04 | Queue/broker | **Resolved (Phase 1–2):** Redis behind an explicit queue abstraction |
 | O-05 | LAN TLS | **Resolved:** Traefik `:80` HTTP for local dev; `:443` HTTPS with local/private CA cert (`mkcert` or campus IT CA) via file provider for LAN deployments |
 | O-06 | Audit key protection | **Resolved:** Ed25519 signing key mounted as read-only secret outside DB/app user + periodic signed checkpoints |
@@ -67,6 +67,7 @@
 | 1.7 | 2026-11-24 | Verified live Docker Compose stack (`/api/ready` green, `0001_initial_schema` migrated), renamed `docs/phase-0/` to `docs/specifications/`, froze Phase 1, and started Phase 2 |
 | 2.0 | 2026-11-24 | Completed Phase 2 backend & execution worker (local Argon2/JWT auth + revocable sessions, tenant RBAC + cross-tenant audit denials, immutable assessment versions + SHA-256 digests, 5 pluggable question modules, idempotent autosave/submit, safe uploads, capsules, out-of-process Judge0 dispatcher, 68 API tests on SQLite & Postgres + 6 worker tests, zero Alembic drift, CI updated); Phase 2 frontend portals pending |
 | 2.1 | 2026-11-24 | Completed Phase 2 React + Vite + Tailwind v4 frontend portals (Auth/Bootstrap, Platform & Tenant Admin, Organizer Dashboard + 5-type Question Editor + Capsules + Results/Grading, Candidate Home + Distraction-Free Exam Runner with monotonic autosave & idempotent submit, Neutral+Emerald Light/Dark themes, 5 Vitest tests, CI updated, live Docker/Traefik verified); froze Phase 2 and started Phase 3 |
+| 3.0 | 2026-11-25 | Completed Phase 3 Infrastructure & Deployment: 3-network segmentation + resource/privilege hardening, reproducible Standalone and Central (Server + credential-free Remote Worker) profiles, Traefik security headers/body-limit/rate-limit + offline LAN HTTPS (`generate-lan-certs.sh` + `compose.tls.yml`), Alembic `0003_worker_registry` (`worker_nodes`) + dispatcher heartbeats + `/api/admin/infrastructure` UI/API, `backup.sh`/`restore.sh`/`smoke-test.sh` + CI profile checks, `O-03` Judge0 audit, and deployment guide; verified 76 API tests, 7 worker tests, 5 Vitest tests, live HTTPS, and backup/restore round-trip |
 
 ## Working rule
 A phase is not complete because code has been generated. It is complete only when acceptance criteria are demonstrated with tests, evidence and updated documentation.

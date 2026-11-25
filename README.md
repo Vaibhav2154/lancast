@@ -3,7 +3,7 @@
 
 LANCAST is a self-hosted, LAN-first assessment platform for colleges, departments, faculty groups, and student organizations. It combines multi-tenant assessment management with two research subsystems: **Capacity-Aware Adaptive Resource Orchestration** and **Assessment-Aware Security and Integrity Orchestration**.
 
-> **Status:** Phase 3 — Infrastructure and Deployment (Phases 0–2 complete)  
+> **Status:** Phase 4 — Monitoring and Telemetry (Phases 0–3 complete)  
 > **Development:** Solo developer, phase-driven  
 > **Deployment:** Centralized campus deployment and standalone single-machine deployment
 
@@ -568,8 +568,12 @@ Never commit `.env`. Avoid unescaped `$` characters in `.env` passwords (or esca
 
 ### Start (Standalone Docker Compose)
 ```bash
-docker compose up -d --build
+# Base + coding sandbox:
+docker compose -f docker-compose.yml -f docker-compose.coding.yml up -d --build
 docker compose exec api alembic upgrade head
+
+# Production standalone or central profiles (with optional offline LAN TLS):
+# See docs/infrastructure/deployment-guide.md and ./infrastructure/scripts/smoke-test.sh
 ```
 
 Open:
@@ -634,6 +638,16 @@ A feature is complete only when implementation, tests, authorization/failure beh
 - [ADR-002-auth-and-database.md](docs/architecture/decisions/ADR-002-auth-and-database.md) — local PostgreSQL + local FastAPI auth, portable `DATABASE_URL`.
 - [ADR-003-audit-signing-and-tls.md](docs/architecture/decisions/ADR-003-audit-signing-and-tls.md) — Traefik LAN TLS and Ed25519 signed audit checkpoints.
 
+### Infrastructure & Operations (`docs/infrastructure/`)
+- [deployment-guide.md](docs/infrastructure/deployment-guide.md) — Standalone & Central profiles, offline LAN HTTPS, firewall allowlists, external DB option, `DEP-06` Internet audit, and backup/restore runbook.
+- [judge0-isolation-audit.md](docs/infrastructure/judge0-isolation-audit.md) — `O-03` Judge0 + `isolate` sandbox isolation audit and cgroup v2 `RLIMIT_AS` analysis.
+
+### Phase Implementation Docs (`docs/phases/`)
+- [docs/phases/README.md](docs/phases/README.md) — Phase-by-phase engineering implementation index.
+- [phase-1-architecture-and-foundation.md](docs/phases/phase-1-architecture-and-foundation.md) — Architecture, 12-table ERD/schema, typed contracts, gateway & CI scaffold.
+- [phase-2-assessment-platform.md](docs/phases/phase-2-assessment-platform.md) — Multi-tenant RBAC, 5 question modules, durable attempts, Judge0 execution, Capsules, and React portals.
+- [phase-3-infrastructure-and-deployment.md](docs/phases/phase-3-infrastructure-and-deployment.md) — Network segmentation, Standalone & Central profiles, offline LAN HTTPS, worker heartbeats, backup/restore & `O-03` audit.
+
 ### Target Documentation Layout
 Maintain documentation alongside implementation:
 
@@ -688,14 +702,14 @@ Rules:
 
 ## 18. Current Status
 
-**Current phase: Phase 3 — Infrastructure and Deployment**
+**Current phase: Phase 4 — Monitoring and Telemetry (Phases 0–3 complete)**
 
 | Phase | Status |
 |---|---|
 | 0 — Research and requirements | Complete |
 | 1 — Architecture and foundation | Complete |
 | 2 — Core assessment platform | Complete |
-| 3 — Infrastructure and deployment | In progress |
+| 3 — Infrastructure and deployment | Complete |
 | 4 — Monitoring and telemetry | Not started |
 | 5 — Resource orchestration | Not started |
 | 6 — Security orchestration | Not started |
