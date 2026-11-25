@@ -33,6 +33,7 @@ def create_app() -> FastAPI:
     application.include_router(tenants.router)
     application.include_router(assessments.router)
     application.include_router(assessments.grading_router)
+    application.include_router(assessments.uploads_router)
     application.include_router(capsules.router)
     application.include_router(attempts.router)
     application.include_router(internal.router)

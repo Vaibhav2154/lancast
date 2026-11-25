@@ -130,6 +130,7 @@ export interface ResultRow {
   submission_status: "queued" | "evaluating" | "pending_review" | "scored" | "failed" | string | null;
   score: number | null;
   scores: Record<string, ResultScoreEntry>;
+  responses: Record<string, Record<string, unknown>>;
 }
 
 export interface MyAssessment {
@@ -137,6 +138,31 @@ export interface MyAssessment {
   assessment_id: string;
   title: string;
   description: string;
+  duration_minutes: number;
+  max_attempts: number;
+  attempts_used: number;
+  can_start: boolean;
+  active_attempt_id: string | null;
+  latest_attempt_id: string | null;
+  latest_attempt_status: string | null;
+  latest_submission_status: string | null;
+  latest_score: number | null;
+  max_score: number;
+}
+
+export interface MyAttempt {
+  attempt_id: string;
+  tenant_id: string;
+  assessment_id: string;
+  assessment_title: string;
+  assessment_status: AssessmentStatus;
+  attempt_status: string;
+  started_at: string;
+  submitted_at: string | null;
+  submission_id: string | null;
+  submission_status: string | null;
+  score: number | null;
+  max_score: number;
 }
 
 export interface SavedResponseView {
@@ -155,6 +181,7 @@ export interface AttemptView {
   questions: CandidateQuestion[];
   responses: Record<string, SavedResponseView>;
   resumed: boolean | null;
+  assessment_title?: string | null;
 }
 
 export interface SavedResponseResult {
@@ -464,6 +491,44 @@ export async function getAssessmentResults(
   );
 }
 
+export async function exportAssessmentResultsCsv(
+  tenantId: string,
+  assessmentId: string
+): Promise<Blob> {
+  const token = getStoredToken();
+  const res = await fetch(
+    `/api/tenants/${tenantId}/assessments/${assessmentId}/results/export`,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  );
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    const { code, message } = extractErrorMessage(errData, `Export failed (HTTP ${res.status})`);
+    throw new ApiError(res.status, code, message);
+  }
+  return res.blob();
+}
+
+export async function downloadUploadedFile(
+  tenantId: string,
+  fileId: string
+): Promise<Blob> {
+  const token = getStoredToken();
+  const res = await fetch(`/api/tenants/${tenantId}/uploads/${fileId}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    const { code, message } = extractErrorMessage(
+      errData,
+      `Download failed (HTTP ${res.status})`
+    );
+    throw new ApiError(res.status, code, message);
+  }
+  return res.blob();
+}
+
 export async function gradeSubmissionQuestion(
   tenantId: string,
   submissionId: string,
@@ -508,6 +573,10 @@ export async function importCapsule(
 // Candidate Attempts
 export async function getMyAssessments(): Promise<MyAssessment[]> {
   return request<MyAssessment[]>("/api/me/assessments");
+}
+
+export async function getMyAttempts(): Promise<MyAttempt[]> {
+  return request<MyAttempt[]>("/api/me/attempts");
 }
 
 export async function startOrResumeAttempt(

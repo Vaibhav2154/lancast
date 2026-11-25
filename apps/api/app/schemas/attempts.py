@@ -35,6 +35,7 @@ class AttemptOut(BaseModel):
     questions: list[CandidateQuestionOut]
     responses: dict[str, SavedResponseView]
     resumed: bool | None = None
+    assessment_title: str | None = None
 
 
 class SubmissionOut(BaseModel):
@@ -58,6 +59,31 @@ class MyAssessmentOut(BaseModel):
     assessment_id: UUID
     title: str
     description: str
+    duration_minutes: int = 60
+    max_attempts: int = 1
+    attempts_used: int = 0
+    can_start: bool = True
+    active_attempt_id: UUID | None = None
+    latest_attempt_id: UUID | None = None
+    latest_attempt_status: str | None = None
+    latest_submission_status: str | None = None
+    latest_score: float | None = None
+    max_score: float = 0.0
+
+
+class MyAttemptOut(BaseModel):
+    attempt_id: UUID
+    tenant_id: UUID
+    assessment_id: UUID
+    assessment_title: str
+    assessment_status: str
+    attempt_status: str
+    started_at: datetime
+    submitted_at: datetime | None
+    submission_id: UUID | None
+    submission_status: str | None
+    score: float | None
+    max_score: float
 
 
 class ExecutionResultCase(BaseModel):

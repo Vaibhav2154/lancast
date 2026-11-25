@@ -108,3 +108,4 @@ class ResultRow(BaseModel):
     submission_status: str | None
     score: float | None
     scores: dict[str, Any]
+    responses: dict[str, dict[str, Any]] = Field(default_factory=dict)

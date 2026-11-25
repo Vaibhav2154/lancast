@@ -17,6 +17,7 @@ from app.core.timeutil import as_utc, utcnow
 from app.db.models import (
     Assessment,
     AssessmentEnrollment,
+    AssessmentVersion,
     Attempt,
     ExecutionJob,
     Question,
@@ -183,6 +184,11 @@ async def load_questions(db: AsyncSession, version_id: UUID) -> list[Question]:
 async def attempt_view(db: AsyncSession, attempt: Attempt) -> dict[str, Any]:
     questions = await load_questions(db, attempt.assessment_version_id)
     responses = (await db.scalars(select(Response).where(Response.attempt_id == attempt.id))).all()
+    assessment_title = await db.scalar(
+        select(Assessment.title)
+        .join(AssessmentVersion, AssessmentVersion.assessment_id == Assessment.id)
+        .where(AssessmentVersion.id == attempt.assessment_version_id)
+    )
     now = utcnow()
     remaining = max(0, int((as_utc(attempt.deadline_at) - now).total_seconds()))
     return {
@@ -192,6 +198,7 @@ async def attempt_view(db: AsyncSession, attempt: Attempt) -> dict[str, Any]:
         "deadline_at": attempt.deadline_at,
         "server_time": now,
         "remaining_seconds": remaining if attempt.status == "in_progress" else 0,
+        "assessment_title": assessment_title,
         "questions": [assessment_service.candidate_question(q) for q in questions],
         "responses": {
             str(r.question_id): {

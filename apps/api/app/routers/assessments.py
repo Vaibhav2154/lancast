@@ -1,11 +1,16 @@
+import csv
+import io
+import re
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
+from fastapi import Response as FastAPIResponse
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 
 from app.contracts.interfaces import ExecutionQueueContract
-from app.core.deps import DbSession, OrganizerCtx
+from app.core.deps import AppSettings, DbSession, OrganizerCtx
 from app.core.errors import api_error
 from app.db.models import (
     Assessment,
@@ -13,8 +18,10 @@ from app.db.models import (
     Attempt,
     Question,
     Submission,
+    UploadedFile,
     User,
 )
+from app.db.models import Response as AttemptResponse
 from app.schemas.assessments import (
     AssessmentCreate,
     AssessmentDetailOut,
@@ -33,7 +40,7 @@ from app.schemas.assessments import (
 )
 from app.services import assessments as svc
 from app.services import attempts as attempt_svc
-from app.services import audit
+from app.services import audit, uploads
 from app.services.execution_queue import get_execution_queue
 
 router = APIRouter(prefix="/api/tenants/{tenant_id}/assessments", tags=["assessments"])
@@ -235,21 +242,51 @@ async def list_enrollments(assessment_id: UUID, ctx: OrganizerCtx, db: DbSession
     return [{"email": u.email, "full_name": u.full_name} for u in users]
 
 
+def _csv_cell(value: Any) -> str:
+    if value is None:
+        return ""
+    text = value.isoformat() if hasattr(value, "isoformat") else str(value)
+    if text and text[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return f"'{text}"
+    return text
+
+
+def _safe_slug(text: str, fallback: str = "assessment") -> str:
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", text).strip("-").lower()
+    return slug[:80] or fallback
+
+
 @router.get("/{assessment_id}/results", response_model=list[ResultRow])
 async def results(assessment_id: UUID, ctx: OrganizerCtx, db: DbSession) -> list[dict]:
     assessment, _ = await _load(db, ctx, assessment_id)
-    rows = await db.execute(
-        select(Attempt, User.email, Submission)
-        .join(User, User.id == Attempt.candidate_id)
-        .join(AssessmentVersion, AssessmentVersion.id == Attempt.assessment_version_id)
-        .outerjoin(Submission, Submission.attempt_id == Attempt.id)
-        .where(
-            AssessmentVersion.assessment_id == assessment.id, Attempt.tenant_id == ctx.tenant_id
+    rows = (
+        await db.execute(
+            select(Attempt, User.email, Submission)
+            .join(User, User.id == Attempt.candidate_id)
+            .join(AssessmentVersion, AssessmentVersion.id == Attempt.assessment_version_id)
+            .outerjoin(Submission, Submission.attempt_id == Attempt.id)
+            .where(
+                AssessmentVersion.assessment_id == assessment.id, Attempt.tenant_id == ctx.tenant_id
+            )
+            .order_by(Attempt.started_at)
         )
-        .order_by(Attempt.started_at)
-    )
+    ).all()
+
+    attempt_ids = [attempt.id for attempt, _, _ in rows]
+    responses_by_attempt: dict[UUID, dict[str, dict[str, Any]]] = {}
+    if attempt_ids:
+        saved = (
+            await db.scalars(
+                select(AttemptResponse).where(AttemptResponse.attempt_id.in_(attempt_ids))
+            )
+        ).all()
+        for resp in saved:
+            responses_by_attempt.setdefault(resp.attempt_id, {})[str(resp.question_id)] = (
+                resp.payload_json
+            )
+
     out = []
-    for attempt, email, submission in rows.all():
+    for attempt, email, submission in rows:
         out.append(
             {
                 "attempt_id": attempt.id,
@@ -261,9 +298,83 @@ async def results(assessment_id: UUID, ctx: OrganizerCtx, db: DbSession) -> list
                 "submission_status": submission.status if submission else None,
                 "score": submission.score if submission else None,
                 "scores": submission.scores_json if submission else {},
+                "responses": responses_by_attempt.get(attempt.id, {}),
             }
         )
     return out
+
+
+@router.get("/{assessment_id}/results/export")
+async def export_results_csv(
+    assessment_id: UUID, ctx: OrganizerCtx, db: DbSession
+) -> FastAPIResponse:
+    """Export all attempts and per-question scores for an assessment as RFC 4180 CSV."""
+    assessment, version = await _load(db, ctx, assessment_id)
+    questions = await svc.list_questions(db, version.id)
+    max_score = round(sum(q.max_score for q in questions), 4)
+
+    rows = (
+        await db.execute(
+            select(Attempt, User.email, User.full_name, Submission)
+            .join(User, User.id == Attempt.candidate_id)
+            .join(AssessmentVersion, AssessmentVersion.id == Attempt.assessment_version_id)
+            .outerjoin(Submission, Submission.attempt_id == Attempt.id)
+            .where(
+                AssessmentVersion.assessment_id == assessment.id, Attempt.tenant_id == ctx.tenant_id
+            )
+            .order_by(Attempt.started_at)
+        )
+    ).all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "candidate_email",
+            "candidate_name",
+            "attempt_id",
+            "attempt_status",
+            "started_at",
+            "submitted_at",
+            "submission_status",
+            "total_score",
+            "max_score",
+            *[f"Q{q.position} ({q.question_type}, max {q.max_score})" for q in questions],
+        ]
+    )
+    for attempt, email, full_name, submission in rows:
+        scores_map = submission.scores_json if submission else {}
+        writer.writerow(
+            [
+                _csv_cell(email),
+                _csv_cell(full_name),
+                _csv_cell(attempt.id),
+                _csv_cell(attempt.status),
+                _csv_cell(attempt.started_at),
+                _csv_cell(attempt.submitted_at),
+                _csv_cell(submission.status if submission else "not_submitted"),
+                _csv_cell(submission.score if submission else ""),
+                _csv_cell(max_score),
+                *[
+                    _csv_cell(
+                        scores_map.get(str(q.id), {}).get("score")
+                        if isinstance(scores_map, dict)
+                        else ""
+                    )
+                    for q in questions
+                ],
+            ]
+        )
+
+    slug = _safe_slug(assessment.title)
+    return FastAPIResponse(
+        content=buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{slug}-results.csv"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 grading_router = APIRouter(prefix="/api/tenants/{tenant_id}/submissions", tags=["grading"])
@@ -306,3 +417,40 @@ async def grade(
     )
     await db.commit()
     return {"submission_id": submission.id, "status": submission.status, "score": submission.score}
+
+
+uploads_router = APIRouter(prefix="/api/tenants/{tenant_id}/uploads", tags=["uploads"])
+
+
+@uploads_router.get("/{file_id}")
+async def download_upload(
+    file_id: UUID, ctx: OrganizerCtx, db: DbSession, settings: AppSettings
+) -> FileResponse:
+    """Download a candidate-uploaded file within the organizer's tenant."""
+    record = await db.scalar(
+        select(UploadedFile).where(
+            UploadedFile.id == file_id, UploadedFile.tenant_id == ctx.tenant_id
+        )
+    )
+    if record is None:
+        raise api_error(404, "NOT_FOUND", "Uploaded file not found")
+    path = uploads.resolve_upload_path(settings, record)
+    await audit.record(
+        db,
+        action="upload.download",
+        resource_type="uploaded_file",
+        resource_id=str(record.id),
+        actor_id=ctx.user.id,
+        tenant_id=ctx.tenant_id,
+        metadata={"attempt_id": str(record.attempt_id), "question_id": str(record.question_id)},
+    )
+    await db.commit()
+    safe_name = re.sub(r'["\r\n\\]', "_", record.original_name)
+    return FileResponse(
+        path=path,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_name}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

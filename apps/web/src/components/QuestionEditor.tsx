@@ -113,7 +113,7 @@ export function QuestionEditor({
   const [languages, setLanguages] = useState<CodingLanguage[]>(() =>
     Array.isArray(initial?.prompt.languages)
       ? (initial.prompt.languages as CodingLanguage[])
-      : ["python3"]
+      : ALL_LANGUAGES.map((l) => l.id)
   );
   const [sampleCases, setSampleCases] = useState<CaseItem[]>(() =>
     Array.isArray(initial?.prompt.sample_cases)

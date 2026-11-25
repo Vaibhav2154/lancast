@@ -84,3 +84,40 @@ async def test_file_answers_cannot_be_set_through_inline_save(client, world):
         headers=world.a.cand,
     )
     assert res.status_code == 422
+
+
+async def test_organizer_can_download_upload_with_tenant_isolation(client, world):
+    aid, qid = await _setup(client, world)
+    up = await client.post(
+        _url(aid, qid),
+        files={"file": ("solution.txt", b"print('hi')", "text/plain")},
+        headers=world.a.cand,
+    )
+    assert up.status_code == 200
+    file_id = up.json()["file_id"]
+
+    # Organizer in tenant A can download the uploaded file with safe headers.
+    dl = await client.get(f"/api/tenants/{world.a.id}/uploads/{file_id}", headers=world.a.org)
+    assert dl.status_code == 200
+    assert dl.content == b"print('hi')"
+    assert 'filename="solution.txt"' in dl.headers.get("content-disposition", "")
+    assert dl.headers.get("x-content-type-options") == "nosniff"
+
+    # Candidate cannot use the organizer upload download route.
+    assert (
+        await client.get(f"/api/tenants/{world.a.id}/uploads/{file_id}", headers=world.a.cand)
+    ).status_code == 403
+
+    # Tenant B organizer is forbidden on tenant A and gets 404 when querying under tenant B.
+    assert (
+        await client.get(f"/api/tenants/{world.a.id}/uploads/{file_id}", headers=world.b.org)
+    ).status_code == 403
+    assert (
+        await client.get(f"/api/tenants/{world.b.id}/uploads/{file_id}", headers=world.b.org)
+    ).status_code == 404
+    assert (
+        await client.get(
+            f"/api/tenants/{world.a.id}/uploads/00000000-0000-0000-0000-000000000000",
+            headers=world.a.org,
+        )
+    ).status_code == 404

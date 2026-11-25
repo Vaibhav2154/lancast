@@ -129,6 +129,7 @@ async def test_unanswered_scores_zero_and_descriptive_needs_manual_grade(client,
     )
     row = results.json()[0]
     assert row["candidate_email"] == world.a.cand_email and row["attempt_status"] == "submitted"
+    assert row["responses"][qids[1]] == {"text": "SYN, SYN-ACK, ACK"}
 
     grade_url = f"/api/tenants/{world.a.id}/submissions/{body['id']}/grades"
     too_high = await client.put(
@@ -190,3 +191,93 @@ async def test_close_finalizes_in_progress_attempts(client, ctx, world):
         )
     ).json()
     assert rows[0]["attempt_status"] == "expired" and rows[0]["score"] == 2.0
+
+
+async def test_csv_results_export_and_formula_safety(client, ctx, world):
+    aid, qids, attempt = await live_assessment(client, world, [MCQ_Q, DESC_Q])
+    await _save(client, world.a.cand, attempt["id"], qids[0], {"selected": "b"}, 1)
+    await _save(client, world.a.cand, attempt["id"], qids[1], {"text": "SYN/ACK"}, 1)
+    await client.post(
+        f"/api/attempts/{attempt['id']}/submit",
+        headers={"Idempotency-Key": "submit-csv-0001", **world.a.cand},
+    )
+
+    # Set candidate full_name to a formula-like string to verify CSV injection neutralization.
+    async with ctx.factory() as db:
+        from app.db.models import User
+
+        cand = await db.scalar(select(User).where(User.email == world.a.cand_email))
+        cand.full_name = "=CMD()"
+        await db.commit()
+
+    res = await client.get(
+        f"/api/tenants/{world.a.id}/assessments/{aid}/results/export", headers=world.a.org
+    )
+    assert res.status_code == 200
+    assert "text/csv" in res.headers["content-type"]
+    assert "-results.csv" in res.headers["content-disposition"]
+    assert res.headers.get("x-content-type-options") == "nosniff"
+    lines = res.text.strip().splitlines()
+    assert len(lines) == 2
+    assert "candidate_email,candidate_name,attempt_id" in lines[0]
+    assert "'=CMD()" in lines[1]
+    assert world.a.cand_email in lines[1]
+
+    # Negative: candidate and cross-tenant organizer are forbidden.
+    assert (
+        await client.get(
+            f"/api/tenants/{world.a.id}/assessments/{aid}/results/export", headers=world.a.cand
+        )
+    ).status_code == 403
+    assert (
+        await client.get(
+            f"/api/tenants/{world.a.id}/assessments/{aid}/results/export", headers=world.b.org
+        )
+    ).status_code == 403
+
+
+async def test_me_assessments_and_me_attempts_history(client, world):
+    aid, qids = await create_assessment(client, world.a, [MCQ_Q], max_attempts=1)
+    await activate(client, world.a, aid, [world.a.cand_email])
+
+    before = (await client.get("/api/me/assessments", headers=world.a.cand)).json()
+    assert len(before) == 1
+    assert before[0]["attempts_used"] == 0
+    assert before[0]["max_attempts"] == 1
+    assert before[0]["can_start"] is True
+    assert before[0]["max_score"] == 2.0
+
+    attempt = (await start_attempt(client, world.a, aid, world.a.cand)).json()
+    assert attempt["assessment_title"] == "Midterm"
+
+    during = (await client.get("/api/me/assessments", headers=world.a.cand)).json()
+    assert during[0]["active_attempt_id"] == attempt["id"]
+    assert during[0]["can_start"] is True
+
+    await _save(client, world.a.cand, attempt["id"], qids[0], {"selected": "b"}, 1)
+    await client.post(
+        f"/api/attempts/{attempt['id']}/submit",
+        headers={"Idempotency-Key": "submit-me-0001", **world.a.cand},
+    )
+
+    after = (await client.get("/api/me/assessments", headers=world.a.cand)).json()
+    assert after[0]["attempts_used"] == 1
+    assert after[0]["can_start"] is False
+    assert after[0]["active_attempt_id"] is None
+    assert after[0]["latest_attempt_id"] == attempt["id"]
+    assert after[0]["latest_submission_status"] == "scored"
+    assert after[0]["latest_score"] == 2.0
+
+    # Close the assessment: active list becomes empty, but attempt history retains the record.
+    await client.post(f"/api/tenants/{world.a.id}/assessments/{aid}/close", headers=world.a.org)
+    assert (await client.get("/api/me/assessments", headers=world.a.cand)).json() == []
+
+    history = (await client.get("/api/me/attempts", headers=world.a.cand)).json()
+    assert len(history) == 1
+    assert history[0]["attempt_id"] == attempt["id"]
+    assert history[0]["assessment_title"] == "Midterm"
+    assert history[0]["assessment_status"] == "closed"
+    assert history[0]["score"] == 2.0 and history[0]["max_score"] == 2.0
+
+    # Isolation: candidate 2 sees none of candidate 1's attempts.
+    assert (await client.get("/api/me/attempts", headers=world.a.cand2)).json() == []

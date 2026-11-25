@@ -2,7 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Header, Response, UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.contracts.interfaces import ExecutionQueueContract
 from app.core.deps import (
@@ -16,12 +16,22 @@ from app.core.deps import (
     deny,
 )
 from app.core.errors import api_error
-from app.db.models import Assessment, AssessmentEnrollment, Attempt, Membership, Submission
+from app.core.timeutil import as_utc, utcnow
+from app.db.models import (
+    Assessment,
+    AssessmentEnrollment,
+    AssessmentVersion,
+    Attempt,
+    Membership,
+    Question,
+    Submission,
+)
 from app.schemas.attempts import (
     AttemptOut,
     CodeRunRequest,
     CodeRunResponse,
     MyAssessmentOut,
+    MyAttemptOut,
     ResponseSave,
     SavedResponseOut,
     SubmissionOut,
@@ -84,22 +94,120 @@ ViewableAttempt = Annotated[Attempt, Depends(_viewable_attempt)]
 
 @router.get("/me/assessments", response_model=list[MyAssessmentOut])
 async def my_assessments(principal: CurrentPrincipal, db: DbSession) -> list[dict]:
-    rows = await db.execute(
-        select(Assessment)
-        .join(AssessmentEnrollment, AssessmentEnrollment.assessment_id == Assessment.id)
-        .where(
-            AssessmentEnrollment.candidate_id == principal.user.id, Assessment.status == "active"
+    assessments = (
+        await db.scalars(
+            select(Assessment)
+            .join(AssessmentEnrollment, AssessmentEnrollment.assessment_id == Assessment.id)
+            .where(
+                AssessmentEnrollment.candidate_id == principal.user.id, Assessment.status == "active"
+            )
+            .order_by(Assessment.title)
         )
-        .order_by(Assessment.title)
-    )
+    ).all()
+
+    now = utcnow()
+    out: list[dict] = []
+    for a in assessments:
+        version = await assessment_svc.current_version(db, a.id)
+        config = assessment_svc.parse_config(version)
+        max_score = float(
+            await db.scalar(
+                select(func.coalesce(func.sum(Question.max_score), 0.0)).where(
+                    Question.assessment_version_id == version.id
+                )
+            )
+            or 0.0
+        )
+        attempt_rows = (
+            await db.execute(
+                select(Attempt, Submission)
+                .outerjoin(Submission, Submission.attempt_id == Attempt.id)
+                .where(
+                    Attempt.candidate_id == principal.user.id,
+                    Attempt.assessment_version_id == version.id,
+                )
+                .order_by(Attempt.started_at.desc())
+            )
+        ).all()
+
+        active_attempt = next(
+            (
+                att
+                for att, _ in attempt_rows
+                if att.status == "in_progress" and as_utc(att.deadline_at) >= now
+            ),
+            None,
+        )
+        attempts_used = len(attempt_rows)
+        window_open = config.closes_at is None or now < as_utc(config.closes_at)
+        can_start = (active_attempt is not None) or (
+            attempts_used < config.max_attempts and window_open
+        )
+        latest_attempt, latest_sub = attempt_rows[0] if attempt_rows else (None, None)
+
+        out.append(
+            {
+                "tenant_id": a.tenant_id,
+                "assessment_id": a.id,
+                "title": a.title,
+                "description": a.description,
+                "duration_minutes": config.duration_minutes,
+                "max_attempts": config.max_attempts,
+                "attempts_used": attempts_used,
+                "can_start": can_start,
+                "active_attempt_id": active_attempt.id if active_attempt else None,
+                "latest_attempt_id": latest_attempt.id if latest_attempt else None,
+                "latest_attempt_status": latest_attempt.status if latest_attempt else None,
+                "latest_submission_status": latest_sub.status if latest_sub else None,
+                "latest_score": latest_sub.score if latest_sub else None,
+                "max_score": round(max_score, 4),
+            }
+        )
+    return out
+
+
+@router.get("/me/attempts", response_model=list[MyAttemptOut])
+async def my_attempts(principal: CurrentPrincipal, db: DbSession) -> list[dict]:
+    """List all assessment attempts belonging to the authenticated candidate."""
+    rows = (
+        await db.execute(
+            select(Attempt, AssessmentVersion, Assessment, Submission)
+            .join(AssessmentVersion, AssessmentVersion.id == Attempt.assessment_version_id)
+            .join(Assessment, Assessment.id == AssessmentVersion.assessment_id)
+            .outerjoin(Submission, Submission.attempt_id == Attempt.id)
+            .where(Attempt.candidate_id == principal.user.id)
+            .order_by(Attempt.started_at.desc())
+        )
+    ).all()
+
+    version_ids = list({ver.id for _, ver, _, _ in rows})
+    max_by_version: dict[UUID, float] = {}
+    if version_ids:
+        totals = (
+            await db.execute(
+                select(Question.assessment_version_id, func.coalesce(func.sum(Question.max_score), 0.0))
+                .where(Question.assessment_version_id.in_(version_ids))
+                .group_by(Question.assessment_version_id)
+            )
+        ).all()
+        max_by_version = {vid: round(float(total), 4) for vid, total in totals}
+
     return [
         {
-            "tenant_id": a.tenant_id,
-            "assessment_id": a.id,
-            "title": a.title,
-            "description": a.description,
+            "attempt_id": attempt.id,
+            "tenant_id": attempt.tenant_id,
+            "assessment_id": assessment.id,
+            "assessment_title": assessment.title,
+            "assessment_status": assessment.status,
+            "attempt_status": attempt.status,
+            "started_at": attempt.started_at,
+            "submitted_at": attempt.submitted_at,
+            "submission_id": submission.id if submission else None,
+            "submission_status": submission.status if submission else None,
+            "score": submission.score if submission else None,
+            "max_score": max_by_version.get(version.id, 0.0),
         }
-        for a in rows.scalars().all()
+        for attempt, version, assessment, submission in rows
     ]
 
 

@@ -16,6 +16,7 @@ import { CodeEditor } from "../components/CodeEditor";
 import { StatusBadge } from "../components/StatusBadge";
 import { useTheme } from "../hooks/useTheme";
 import {
+  ApiError,
   AttemptView,
   CandidateQuestion,
   CodeRunResponse,
@@ -30,6 +31,14 @@ import {
 import { clearSubmitKey, getOrCreateSubmitKey, nextClientSeq } from "../lib/autosave";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  python3: "Python 3",
+  c: "C",
+  cpp: "C++",
+  java: "Java",
+  javascript: "JavaScript",
+};
 
 function formatClock(totalSeconds: number): string {
   const s = Math.max(0, totalSeconds);
@@ -48,7 +57,7 @@ export function ExamRunnerPage() {
   const navState = location.state as { initialAttempt?: AttemptView; title?: string } | null;
 
   const [attempt, setAttempt] = useState<AttemptView | null>(navState?.initialAttempt ?? null);
-  const [title] = useState<string>(navState?.title ?? "LANCAST Assessment");
+  const title = navState?.title ?? attempt?.assessment_title ?? "LANCAST Assessment";
   const [currentIdx, setCurrentIdx] = useState(0);
   const [drafts, setDrafts] = useState<Record<string, Record<string, unknown>>>({});
   const [remainingSeconds, setRemainingSeconds] = useState<number>(
@@ -65,6 +74,7 @@ export function ExamRunnerPage() {
 
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [autoSubmitting, setAutoSubmitting] = useState(false);
   const [submission, setSubmission] = useState<SubmissionResult | null>(null);
 
   const [useCustomStdin, setUseCustomStdin] = useState<Record<string, boolean>>({});
@@ -75,6 +85,16 @@ export function ExamRunnerPage() {
 
   const seqRef = useRef<Record<string, number>>({});
   const debounceRef = useRef<Record<string, number>>({});
+  const draftsRef = useRef<Record<string, Record<string, unknown>>>({});
+  const pendingDirtyRef = useRef<Set<string>>(new Set());
+  const submittingRef = useRef(false);
+  const autoSubmittedRef = useRef(false);
+
+  draftsRef.current = drafts;
+
+  useEffect(() => {
+    autoSubmittedRef.current = false;
+  }, [attemptId]);
 
   const hydrateFromAttempt = useCallback((data: AttemptView) => {
     setAttempt(data);
@@ -176,6 +196,7 @@ export function ExamRunnerPage() {
   const persistResponse = useCallback(
     async (questionId: string, payload: Record<string, unknown>) => {
       if (!attemptId) return;
+      pendingDirtyRef.current.delete(questionId);
       const seq = nextClientSeq(seqRef.current, questionId);
       seqRef.current = { ...seqRef.current, [questionId]: seq };
       setSaveState("saving");
@@ -193,6 +214,7 @@ export function ExamRunnerPage() {
   );
 
   function scheduleSave(questionId: string, payload: Record<string, unknown>, delayMs: number) {
+    pendingDirtyRef.current.add(questionId);
     const existing = debounceRef.current[questionId];
     if (existing) window.clearTimeout(existing);
     debounceRef.current[questionId] = window.setTimeout(() => {
@@ -207,6 +229,8 @@ export function ExamRunnerPage() {
   ) {
     setDrafts((prev) => ({ ...prev, [q.id]: payload }));
     if (debounceMs === null) {
+      const existing = debounceRef.current[q.id];
+      if (existing) window.clearTimeout(existing);
       void persistResponse(q.id, payload);
     } else {
       scheduleSave(q.id, payload, debounceMs);
@@ -240,24 +264,65 @@ export function ExamRunnerPage() {
     }
   }
 
-  async function handleSubmitExam() {
-    if (!attemptId) return;
-    setSubmitting(true);
-    setSaveError(null);
-    // Flush any pending debounced text/code saves right before submitting
-    Object.values(debounceRef.current).forEach((t) => window.clearTimeout(t));
-    try {
-      const key = getOrCreateSubmitKey(attemptId);
-      const res = await submitAttempt(attemptId, key);
-      clearSubmitKey(attemptId);
-      setSubmission(res);
+  const handleSubmitExam = useCallback(
+    async (options?: { auto?: boolean }) => {
+      if (!attemptId || submittingRef.current) return;
+      submittingRef.current = true;
+      setSubmitting(true);
+      if (options?.auto) {
+        setAutoSubmitting(true);
+      }
+      setSaveError(null);
+
+      // Flush any pending debounced text/code saves right before submitting.
+      Object.values(debounceRef.current).forEach((t) => window.clearTimeout(t));
+      const dirtyIds = Array.from(pendingDirtyRef.current);
+      if (dirtyIds.length > 0) {
+        await Promise.allSettled(
+          dirtyIds.map((qid) => {
+            const payload = draftsRef.current[qid];
+            return payload ? persistResponse(qid, payload) : Promise.resolve();
+          })
+        );
+      }
+
+      try {
+        const key = getOrCreateSubmitKey(attemptId);
+        const res = await submitAttempt(attemptId, key);
+        clearSubmitKey(attemptId);
+        setSubmission(res);
+        setConfirmSubmit(false);
+      } catch (err: unknown) {
+        if (err instanceof ApiError && err.code === "ALREADY_SUBMITTED") {
+          clearSubmitKey(attemptId);
+          try {
+            const existing = await getAttemptSubmission(attemptId);
+            setSubmission(existing);
+            setConfirmSubmit(false);
+            return;
+          } catch {
+            // Fall through to error display if status fetch also failed.
+          }
+        }
+        setSaveError(err instanceof Error ? err.message : "Submission failed — please retry");
+      } finally {
+        submittingRef.current = false;
+        setSubmitting(false);
+        setAutoSubmitting(false);
+      }
+    },
+    [attemptId, persistResponse]
+  );
+
+  // Auto-submit once when the countdown hits 00:00
+  useEffect(() => {
+    if (!attempt || attempt.status !== "in_progress" || submission) return;
+    if (remainingSeconds <= 0 && !autoSubmittedRef.current) {
+      autoSubmittedRef.current = true;
       setConfirmSubmit(false);
-    } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : "Submission failed — please retry");
-    } finally {
-      setSubmitting(false);
+      void handleSubmitExam({ auto: true });
     }
-  }
+  }, [attempt, remainingSeconds, submission, handleSubmitExam]);
 
   async function handleRunCode(q: CandidateQuestion) {
     if (!attemptId) return;
@@ -486,6 +551,13 @@ export function ExamRunnerPage() {
 
         {/* Right Active Question */}
         <main className="lg:col-span-9">
+          {autoSubmitting && (
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-xs font-semibold text-warn">
+              <Clock className="h-4 w-4 shrink-0" />
+              Time expired — automatically submitting your responses...
+            </div>
+          )}
+
           {saveError && (
             <div className="mb-4 flex items-center gap-2 rounded-xl bg-danger-soft px-4 py-3 text-xs font-semibold text-danger">
               <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -708,7 +780,7 @@ export function ExamRunnerPage() {
                             >
                               {langs.map((l) => (
                                 <option key={l} value={l}>
-                                  {l}
+                                  {LANGUAGE_LABELS[l] ?? l}
                                 </option>
                               ))}
                             </select>

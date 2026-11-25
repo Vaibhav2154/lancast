@@ -106,3 +106,12 @@ async def next_seq(db: AsyncSession, attempt_id: UUID, question_id: UUID) -> int
         )
     )
     return (existing or 0) + 1
+
+
+def resolve_upload_path(settings: Settings, record: UploadedFile) -> Path:
+    """Resolve and verify an uploaded file path inside settings.upload_dir."""
+    root = Path(settings.upload_dir).resolve()
+    path = (root / str(record.tenant_id) / str(record.attempt_id) / record.stored_name).resolve()
+    if not path.is_relative_to(root) or not path.is_file():
+        raise api_error(404, "FILE_MISSING", "Uploaded file is no longer available on disk")
+    return path
