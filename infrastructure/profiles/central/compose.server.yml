@@ -1,0 +1,48 @@
+# Central Campus Server Profile Overlay (DEP-01, DEP-03)
+#
+# Runs Traefik, React SPA (web), horizontally scaled FastAPI pool (api),
+# PostgreSQL, and Redis on the central campus machine. Remote execution worker
+# machines run `infrastructure/profiles/central/compose.worker.yml` and connect
+# ONLY to Redis + Traefik's dedicated worker port (never PostgreSQL; T19).
+#
+# Usage:
+#   docker compose \
+#     --env-file infrastructure/profiles/central/.env.server \
+#     -f docker-compose.yml \
+#     -f infrastructure/profiles/central/compose.server.yml \
+#     up -d --build
+
+x-log-rotation: &log-rotation
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  traefik:
+    ports:
+      - "${GATEWAY_HTTP_PORT:-80}:80"
+      - "${GATEWAY_HTTPS_PORT:-443}:443"
+      # Dedicated worker callback entrypoint; bind to internal LAN/VLAN IP + firewall to workers.
+      - "${WORKER_BIND_IP:-127.0.0.1}:${GATEWAY_WORKER_PORT:-8081}:8081"
+    logging: *log-rotation
+
+  web:
+    logging: *log-rotation
+
+  api:
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEPLOYMENT_PROFILE: central
+    deploy:
+      replicas: ${API_REPLICAS:-2}
+    logging: *log-rotation
+
+  postgres:
+    logging: *log-rotation
+
+  redis:
+    ports:
+      # Exposed ONLY on WORKER_BIND_IP for remote dispatchers; firewall to worker IPs.
+      - "${WORKER_BIND_IP:-127.0.0.1}:${REDIS_WORKER_PORT:-6379}:6379"
+    logging: *log-rotation

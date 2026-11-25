@@ -1,0 +1,105 @@
+# Central Profile — Remote Execution Worker Node Stack (DEP-01, T07, T08, T19)
+#
+# Runs ONLY on separate lab/worker machine(s). Holds ZERO LANCAST PostgreSQL
+# credentials; communicates exclusively with Central Redis (queue) and Central
+# Traefik worker entrypoint `/api/internal/*` using WORKER_SHARED_SECRET.
+#
+# Usage on worker machine:
+#   docker compose \
+#     --env-file infrastructure/profiles/central/.env.worker \
+#     -f infrastructure/profiles/central/compose.worker.yml \
+#     up -d --build
+
+services:
+  dispatcher:
+    build:
+      context: ../../../execution
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://127.0.0.1:6379/0}
+      API_BASE_URL: ${API_BASE_URL:-http://127.0.0.1:8081}
+      WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET:-dev-only-worker-secret-change-me}
+      JUDGE0_URL: http://judge0-server:2358
+      WORKER_ID: ${WORKER_ID:-worker-node-1}
+      DEPLOYMENT_PROFILE: central
+    depends_on:
+      - judge0-server
+    mem_limit: 256m
+    cpus: "1.0"
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - worker_internal
+
+  judge0-server:
+    image: judge0/judge0:1.13.1
+    restart: unless-stopped
+    command: ["./scripts/server"]
+    privileged: true # required by isolate
+    environment: &judge0_env
+      REDIS_HOST: judge0-redis
+      POSTGRES_HOST: judge0-db
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: ${JUDGE0_DB_PASSWORD:-judge0-local-password}
+      ENABLE_NETWORK: "false"
+      ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT: "true"
+      ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT: "true"
+      MAX_CPU_TIME_LIMIT: "10"
+      MAX_MEMORY_LIMIT: "8388608"
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    mem_limit: 1536m
+    cpus: "2.0"
+    networks:
+      - worker_internal
+
+  judge0-worker:
+    image: judge0/judge0:1.13.1
+    restart: unless-stopped
+    command: ["./scripts/workers"]
+    privileged: true # required by isolate
+    environment: *judge0_env
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    mem_limit: 1536m
+    cpus: "2.0"
+    networks:
+      - worker_internal
+
+  judge0-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: ${JUDGE0_DB_PASSWORD:-judge0-local-password}
+    volumes:
+      - judge0_worker_db_data:/var/lib/postgresql/data
+    mem_limit: 256m
+    cpus: "0.5"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - worker_internal
+
+  judge0-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: "0.5"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - worker_internal
+
+networks:
+  worker_internal:
+    driver: bridge
+
+volumes:
+  judge0_worker_db_data:

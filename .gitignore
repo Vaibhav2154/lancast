@@ -2,11 +2,13 @@
 .env
 .env.*
 !.env.example
+!.env.*.example
 *.pem
 *.key
 *.crt
 infrastructure/gateway/certs/
 secrets/
+backups/
 
 # Python
 __pycache__/

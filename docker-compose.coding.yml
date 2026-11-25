@@ -2,11 +2,12 @@
 #
 # Usage:  docker compose -f docker-compose.yml -f docker-compose.coding.yml up -d --build
 #
-# NOTE: not exercised in CI. Both judge0-server (for wait=true inline runs) and judge0-worker
-# require `privileged: true` for `isolate`. Per-process time/memory limits are enabled so
-# `isolate` runs cleanly on cgroup v2 Linux hosts without requiring cgroup v1 kernel flags.
-# Audit this isolation boundary in Phase 3 before running untrusted code on a shared host.
-# Judge0 is NOT published to the host; only the api and dispatcher can reach it internally.
+# Network segmentation (T08, T19):
+#   - judge0-* containers live strictly on `lancast_execution` (cannot reach `postgres` or `traefik`).
+#   - `dispatcher` holds NO database credentials; it reads jobs from Redis (`lancast_internal`),
+#     calls Judge0 (`lancast_execution`), and posts results to the API with X-Worker-Token.
+#   - `judge0-server` / `judge0-worker` require `privileged: true` for `isolate`; physical RAM is
+#     capped via `mem_limit` while `MAX_MEMORY_LIMIT` gives OpenJDK/V8 virtual RLIMIT_AS headroom.
 
 services:
   dispatcher:
@@ -19,13 +20,23 @@ services:
       API_BASE_URL: http://api:8000
       WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET:-dev-only-worker-secret-change-me}
       JUDGE0_URL: http://judge0-server:2358
-      WORKER_ID: dispatcher-1
+      WORKER_ID: ${WORKER_ID:-dispatcher-1}
+      DEPLOYMENT_PROFILE: ${DEPLOYMENT_PROFILE:-standalone}
     depends_on:
-      - api
-      - redis
-      - judge0-server
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      judge0-server:
+        condition: service_started
+    mem_limit: 256m
+    cpus: "1.0"
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
     networks:
       - lancast_internal
+      - lancast_execution
 
   judge0-server:
     image: judge0/judge0:1.13.1
@@ -47,8 +58,10 @@ services:
     depends_on:
       - judge0-db
       - judge0-redis
+    mem_limit: 1536m
+    cpus: "2.0"
     networks:
-      - lancast_internal
+      - lancast_execution
 
   judge0-worker:
     image: judge0/judge0:1.13.1
@@ -59,8 +72,10 @@ services:
     depends_on:
       - judge0-db
       - judge0-redis
+    mem_limit: 1536m
+    cpus: "2.0"
     networks:
-      - lancast_internal
+      - lancast_execution
 
   judge0-db:
     image: postgres:16-alpine
@@ -71,14 +86,22 @@ services:
       POSTGRES_PASSWORD: ${JUDGE0_DB_PASSWORD:-judge0-local-password}
     volumes:
       - judge0_db_data:/var/lib/postgresql/data
+    mem_limit: 256m
+    cpus: "0.5"
+    security_opt:
+      - no-new-privileges:true
     networks:
-      - lancast_internal
+      - lancast_execution
 
   judge0-redis:
     image: redis:7-alpine
     restart: unless-stopped
+    mem_limit: 128m
+    cpus: "0.5"
+    security_opt:
+      - no-new-privileges:true
     networks:
-      - lancast_internal
+      - lancast_execution
 
 volumes:
   judge0_db_data:

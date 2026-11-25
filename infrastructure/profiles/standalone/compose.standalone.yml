@@ -1,0 +1,41 @@
+# Standalone Single-Server Production Profile Overlay (DEP-02, DEP-03, DEP-04)
+#
+# Usage:
+#   docker compose \
+#     --env-file infrastructure/profiles/standalone/.env.standalone \
+#     -f docker-compose.yml \
+#     -f docker-compose.coding.yml \
+#     -f infrastructure/profiles/standalone/compose.standalone.yml \
+#     up -d --build
+#
+# For TLS on campus LAN/Wi-Fi, append `-f infrastructure/gateway/compose.tls.yml`.
+
+x-log-rotation: &log-rotation
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  traefik:
+    logging: *log-rotation
+
+  web:
+    logging: *log-rotation
+
+  api:
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEPLOYMENT_PROFILE: standalone
+    logging: *log-rotation
+
+  postgres:
+    logging: *log-rotation
+
+  redis:
+    logging: *log-rotation
+
+  dispatcher:
+    environment:
+      DEPLOYMENT_PROFILE: standalone
+    logging: *log-rotation
