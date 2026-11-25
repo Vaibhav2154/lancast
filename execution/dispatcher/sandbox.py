@@ -1,5 +1,6 @@
 """Sandbox runners. The runner interface lets tests (and CI) run without privileged Judge0."""
 
+import base64
 from typing import Any, Protocol
 
 import httpx
@@ -13,6 +14,12 @@ JUDGE0_LANGUAGE_IDS = {
     "javascript": 63,
 }
 
+# Under isolate -m (RLIMIT_AS), OpenJDK and V8 reserve large virtual address spaces upfront.
+_LANGUAGE_MIN_MEMORY_KB = {
+    "javascript": 2048000,
+    "java": 8388608,
+}
+
 # Judge0 status ids -> LANCAST verdicts.
 _VERDICTS = {
     3: "accepted",
@@ -20,6 +27,10 @@ _VERDICTS = {
     5: "timed_out",
     6: "compile_error",
 }
+
+
+def _b64_encode(text: str) -> str:
+    return base64.b64encode(text.encode("utf-8")).decode("ascii")
 
 
 class SandboxError(Exception):
@@ -40,22 +51,24 @@ class Judge0Runner:
         self._client = client or httpx.Client(timeout=timeout)
 
     def run_case(self, job: dict[str, Any], case: dict[str, Any]) -> dict[str, Any]:
-        language_id = JUDGE0_LANGUAGE_IDS.get(job["language"])
+        language = job["language"]
+        language_id = JUDGE0_LANGUAGE_IDS.get(language)
         if language_id is None:
-            raise SandboxError(f"unsupported language {job['language']!r}")
+            raise SandboxError(f"unsupported language {language!r}")
+        memory_kb = max(int(job["memory_limit_mb"]) * 1024, _LANGUAGE_MIN_MEMORY_KB.get(language, 0))
         payload = {
-            "source_code": job["source_code"],
+            "source_code": _b64_encode(job["source_code"]),
             "language_id": language_id,
-            "stdin": case.get("stdin", ""),
-            "expected_output": case["expected_stdout"],
+            "stdin": _b64_encode(case.get("stdin", "")),
+            "expected_output": _b64_encode(case["expected_stdout"]),
             "cpu_time_limit": job["cpu_time_limit_sec"],
-            "memory_limit": int(job["memory_limit_mb"]) * 1024,  # Judge0 expects KB
+            "memory_limit": memory_kb,  # Judge0 expects KB
             "enable_network": False,
         }
         try:
             res = self._client.post(
                 f"{self._base}/submissions",
-                params={"base64_encoded": "false", "wait": "true"},
+                params={"base64_encoded": "true", "wait": "true"},
                 json=payload,
             )
             res.raise_for_status()

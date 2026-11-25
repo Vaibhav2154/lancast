@@ -1,5 +1,6 @@
 """Interactive code execution runner for candidate sample/custom-input runs (FR-CODE-01..04)."""
 
+import base64
 from typing import Annotated, Any, Protocol
 
 import httpx
@@ -15,12 +16,33 @@ JUDGE0_LANGUAGE_IDS: dict[str, int] = {
     "javascript": 63,
 }
 
+# Under isolate -m (RLIMIT_AS), runtimes like OpenJDK and V8 reserve large
+# virtual address spaces upfront even when resident usage stays small.
+_LANGUAGE_MIN_MEMORY_KB: dict[str, int] = {
+    "javascript": 2048000,
+    "java": 8388608,
+}
+
 _VERDICTS: dict[int, str] = {
     3: "accepted",
     4: "wrong_answer",
     5: "timed_out",
     6: "compile_error",
 }
+
+
+def _b64_encode(text: str) -> str:
+    return base64.b64encode(text.encode("utf-8")).decode("ascii")
+
+
+def _b64_decode(raw: Any) -> str:
+    if not raw:
+        return ""
+    text = str(raw)
+    try:
+        return base64.b64decode(text).decode("utf-8", errors="replace")
+    except (ValueError, TypeError):
+        return text
 
 
 class SandboxUnavailableError(Exception):
@@ -63,22 +85,23 @@ class Judge0CodeRunner:
         if language_id is None:
             raise SandboxUnavailableError(f"Unsupported language {language!r}")
 
+        memory_kb = max(int(memory_limit_mb) * 1024, _LANGUAGE_MIN_MEMORY_KB.get(language, 0))
         payload: dict[str, Any] = {
-            "source_code": source_code,
+            "source_code": _b64_encode(source_code),
             "language_id": language_id,
-            "stdin": stdin,
+            "stdin": _b64_encode(stdin),
             "cpu_time_limit": cpu_time_limit_sec,
-            "memory_limit": int(memory_limit_mb) * 1024,
+            "memory_limit": memory_kb,
             "enable_network": False,
         }
         if expected_stdout is not None:
-            payload["expected_output"] = expected_stdout
+            payload["expected_output"] = _b64_encode(expected_stdout)
 
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 res = await client.post(
                     f"{self._base}/submissions",
-                    params={"base64_encoded": "false", "wait": "true"},
+                    params={"base64_encoded": "true", "wait": "true"},
                     json=payload,
                 )
                 res.raise_for_status()
@@ -98,12 +121,16 @@ class Judge0CodeRunner:
         except (TypeError, ValueError):
             time_sec = None
 
+        stderr = _b64_decode(body.get("stderr"))
+        if not stderr and body.get("message") and verdict != "accepted":
+            stderr = _b64_decode(body.get("message"))
+
         return {
             "stdin": stdin,
             "expected_stdout": expected_stdout,
-            "stdout": body.get("stdout") or "",
-            "stderr": body.get("stderr") or "",
-            "compile_output": body.get("compile_output") or "",
+            "stdout": _b64_decode(body.get("stdout")),
+            "stderr": stderr,
+            "compile_output": _b64_decode(body.get("compile_output")),
             "verdict": verdict,
             "passed": passed,
             "time_sec": time_sec,

@@ -1,3 +1,5 @@
+import base64
+
 import httpx
 import pytest
 
@@ -70,9 +72,21 @@ def test_judge0_runner_maps_statuses_and_limits():
     runner = _judge0(3, seen)
     out = runner.run_case(JOB, JOB["test_cases"][0])
     assert out == {"passed": True, "verdict": "accepted"}
+    assert seen[0].url.params["base64_encoded"] == "true"
     body = __import__("json").loads(seen[0].content)
     assert body["language_id"] == 71 and body["memory_limit"] == 128 * 1024
     assert body["cpu_time_limit"] == 2 and body["enable_network"] is False
+    assert base64.b64decode(body["source_code"]).decode() == JOB["source_code"]
+    assert base64.b64decode(body["stdin"]).decode() == "a"
+    assert base64.b64decode(body["expected_output"]).decode() == "a"
+
+    java_seen: list[httpx.Request] = []
+    _judge0(3, java_seen).run_case({**JOB, "language": "java"}, JOB["test_cases"][0])
+    assert __import__("json").loads(java_seen[0].content)["memory_limit"] == 8388608
+
+    js_seen: list[httpx.Request] = []
+    _judge0(3, js_seen).run_case({**JOB, "language": "javascript"}, JOB["test_cases"][0])
+    assert __import__("json").loads(js_seen[0].content)["memory_limit"] == 2048000
 
     assert _judge0(4).run_case(JOB, JOB["test_cases"][0])["verdict"] == "wrong_answer"
     assert _judge0(5).run_case(JOB, JOB["test_cases"][0])["verdict"] == "timed_out"

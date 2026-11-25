@@ -1,7 +1,12 @@
+import base64
+import json
+
+import httpx
 from helpers import CODING_Q, MCQ_Q, live_assessment
 from sqlalchemy import select
 
 from app.db.models import ExecutionJob
+from app.services.code_runner import Judge0CodeRunner
 
 SECRET = {"X-Worker-Token": "test-worker-secret-0123456789"}
 CODE = {"language": "python3", "source_code": "print(input())"}
@@ -196,3 +201,57 @@ async def test_run_code_custom_stdin_and_validation(client, ctx, world):
     ctx.runner.fail_with_unavailable = True
     offline = await client.post(url, json=CODE, headers=world.a.cand)
     assert offline.status_code == 503 and offline.json()["detail"]["code"] == "SANDBOX_UNAVAILABLE"
+
+
+async def test_judge0_code_runner_uses_base64_and_decodes_unicode_compile_errors(monkeypatch):
+    captured: list[httpx.Request] = []
+    gcc_error = "main.c: In function ‘main’: expected ‘}’ before EOF"
+    orig_client = httpx.AsyncClient
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(
+            201,
+            json={
+                "status": {"id": 6, "description": "Compilation Error"},
+                "stdout": None,
+                "stderr": None,
+                "compile_output": base64.b64encode(gcc_error.encode("utf-8")).decode("ascii"),
+                "time": None,
+            },
+        )
+
+    monkeypatch.setattr(
+        "app.services.code_runner.httpx.AsyncClient",
+        lambda **kwargs: orig_client(transport=httpx.MockTransport(handler)),
+    )
+
+    runner = Judge0CodeRunner("http://judge0:2358")
+    out = await runner.run_case(
+        language="c",
+        source_code="void main(){ return }",
+        stdin="100",
+        expected_stdout="1000",
+        cpu_time_limit_sec=2.0,
+        memory_limit_mb=256,
+    )
+    assert captured[0].url.params["base64_encoded"] == "true"
+    sent = json.loads(captured[0].content)
+    assert base64.b64decode(sent["source_code"]).decode() == "void main(){ return }"
+    assert base64.b64decode(sent["stdin"]).decode() == "100"
+    assert base64.b64decode(sent["expected_output"]).decode() == "1000"
+    assert sent["memory_limit"] == 256 * 1024
+    assert out["verdict"] == "compile_error"
+    assert out["passed"] is False
+    assert "‘main’" in out["compile_output"]
+
+    # Java receives its RLIMIT_AS virtual memory floor even when question limit is 256 MB.
+    await runner.run_case(
+        language="java",
+        source_code="class Main {}",
+        stdin="",
+        expected_stdout="",
+        cpu_time_limit_sec=2.0,
+        memory_limit_mb=256,
+    )
+    assert json.loads(captured[1].content)["memory_limit"] == 8388608

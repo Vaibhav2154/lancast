@@ -42,7 +42,8 @@ services:
       ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT: "true"
       ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT: "true"
       MAX_CPU_TIME_LIMIT: "10"
-      MAX_MEMORY_LIMIT: "512000"
+      # Per-process isolate uses RLIMIT_AS (virtual address space), so OpenJDK/V8 need >=8 GB ceiling.
+      MAX_MEMORY_LIMIT: "8388608"
     depends_on:
       - judge0-db
       - judge0-redis
