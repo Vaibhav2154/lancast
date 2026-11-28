@@ -1,7 +1,7 @@
 # LANCAST — Project Status and Phase Tracker
 
-**Current phase:** Phase 4 — Monitoring and Telemetry  
-**Status:** Not started (Phase 3 complete) | **Last updated:** 25 November 2026
+**Current phase:** Phase 5 — Capacity-Aware Resource Orchestration  
+**Status:** Not started (Phase 4 complete) | **Last updated:** 27 November 2026
 
 ## Confirmed decisions
 - [x] Project name: LANCAST.
@@ -23,7 +23,7 @@
 | 1 | Architecture and foundation | Complete | Repo skeleton, ERD, API contracts, configuration and test foundation |
 | 2 | Assessment platform | Complete | Multi-tenant assessment lifecycle and modules work |
 | 3 | Infrastructure/deployment | Complete | Central and standalone profiles deploy reproducibly |
-| 4 | Monitoring/telemetry | Not started | Required metrics collected and validated |
+| 4 | Monitoring/telemetry | Complete | Required metrics collected and validated |
 | 5 | Resource orchestration | Not started | Estimator, readiness, admission and scheduler tested |
 | 6 | Security orchestration | Not started | Context policies, replay controls and audit integrity tested |
 | 7 | Integration/control plane | Not started | Application and both engines operate together |
@@ -68,6 +68,7 @@
 | 2.0 | 2026-11-24 | Completed Phase 2 backend & execution worker (local Argon2/JWT auth + revocable sessions, tenant RBAC + cross-tenant audit denials, immutable assessment versions + SHA-256 digests, 5 pluggable question modules, idempotent autosave/submit, safe uploads, capsules, out-of-process Judge0 dispatcher, 68 API tests on SQLite & Postgres + 6 worker tests, zero Alembic drift, CI updated); Phase 2 frontend portals pending |
 | 2.1 | 2026-11-24 | Completed Phase 2 React + Vite + Tailwind v4 frontend portals (Auth/Bootstrap, Platform & Tenant Admin, Organizer Dashboard + 5-type Question Editor + Capsules + Results/Grading, Candidate Home + Distraction-Free Exam Runner with monotonic autosave & idempotent submit, Neutral+Emerald Light/Dark themes, 5 Vitest tests, CI updated, live Docker/Traefik verified); froze Phase 2 and started Phase 3 |
 | 3.0 | 2026-11-25 | Completed Phase 3 Infrastructure & Deployment: 3-network segmentation + resource/privilege hardening, reproducible Standalone and Central (Server + credential-free Remote Worker) profiles, Traefik security headers/body-limit/rate-limit + offline LAN HTTPS (`generate-lan-certs.sh` + `compose.tls.yml`), Alembic `0003_worker_registry` (`worker_nodes`) + dispatcher heartbeats + `/api/admin/infrastructure` UI/API, `backup.sh`/`restore.sh`/`smoke-test.sh` + CI profile checks, `O-03` Judge0 audit, and deployment guide; verified 76 API tests, 7 worker tests, 5 Vitest tests, live HTTPS, and backup/restore round-trip |
+| 4.0 | 2026-11-27 | Completed Phase 4 Monitoring & Telemetry: pure-ASGI workload-classified Prometheus metrics (`apps/api/app/core/metrics.py`) + Traefik `/metrics` 403 block & `:8082` scrape port, Alembic `0004_telemetry_samples` + clock-skew/retention-bounded ingestion (`POST /api/internal/telemetry/samples`) & stale/missing safe-fallback API (`GET /api/admin/telemetry`), worker `/proc` collector + `:9108/metrics`, `docker-compose.monitoring.yml` (Prometheus 15d/2GB + 10 alert rules + Grafana auto-provisioned dashboards + Node Exporter/cAdvisor/Postgres/Redis exporters), Admin UI telemetry panel, `verify-monitoring.sh`, measured overhead (~246 MiB RAM, +11.8 µs/req ASGI delta), and CI validation; verified 80 API tests, 8 worker tests, 5 Vitest tests, 8/8 Prometheus targets UP |
 
 ## Working rule
 A phase is not complete because code has been generated. It is complete only when acceptance criteria are demonstrated with tests, evidence and updated documentation.

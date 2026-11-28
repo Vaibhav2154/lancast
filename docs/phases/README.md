@@ -12,12 +12,12 @@ This directory records the **concrete engineering implementation** completed in 
 | Phase 1 | Architecture and Project Foundation | Complete | [phase-1-architecture-and-foundation.md](phase-1-architecture-and-foundation.md) |
 | Phase 2 | Core Multi-Tenant Assessment Platform | Complete | [phase-2-assessment-platform.md](phase-2-assessment-platform.md) |
 | Phase 3 | Infrastructure and Deployment | Complete | [phase-3-infrastructure-and-deployment.md](phase-3-infrastructure-and-deployment.md) |
+| Phase 4 | Monitoring and Telemetry | Complete | [phase-4-monitoring-and-telemetry.md](phase-4-monitoring-and-telemetry.md) |
 
 ## Upcoming Phases
 
 | Phase | Title | Planned Scope |
 |---|---|---|
-| Phase 4 | Monitoring and Telemetry | Node/service exporters, Prometheus scrape stack, Grafana dashboards, latency/queue metrics |
 | Phase 5 | Capacity-Aware Resource Orchestration | Workload profiling, capacity estimator, pre-event admission control, adaptive scheduling & fairness |
 | Phase 6 | Security and Integrity Orchestration | Context-aware policy engine, risk signals, proportional enforcement, Ed25519 audit checkpoints |
 | Phase 7 | Integration and Unified Control Plane | End-to-end wiring of platform workflows with both orchestration engines |

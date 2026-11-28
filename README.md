@@ -3,7 +3,7 @@
 
 LANCAST is a self-hosted, LAN-first assessment platform for colleges, departments, faculty groups, and student organizations. It combines multi-tenant assessment management with two research subsystems: **Capacity-Aware Adaptive Resource Orchestration** and **Assessment-Aware Security and Integrity Orchestration**.
 
-> **Status:** Phase 4 — Monitoring and Telemetry (Phases 0–3 complete)  
+> **Status:** Phase 5 — Capacity-Aware Resource Orchestration (Phases 0–4 complete)  
 > **Development:** Solo developer, phase-driven  
 > **Deployment:** Centralized campus deployment and standalone single-machine deployment
 
@@ -641,6 +641,7 @@ A feature is complete only when implementation, tests, authorization/failure beh
 
 ### Infrastructure & Operations (`docs/infrastructure/`)
 - [deployment-guide.md](docs/infrastructure/deployment-guide.md) — Standalone & Central profiles, offline LAN HTTPS, firewall allowlists, external DB option, `DEP-06` Internet audit, and backup/restore runbook.
+- [monitoring-guide.md](docs/infrastructure/monitoring-guide.md) — Prometheus/Grafana stack, workload metrics catalog, normalized telemetry & stale fallback, privacy audit, and measured monitoring overhead.
 - [judge0-isolation-audit.md](docs/infrastructure/judge0-isolation-audit.md) — `O-03` Judge0 + `isolate` sandbox isolation audit and cgroup v2 `RLIMIT_AS` analysis.
 
 ### Phase Implementation Docs (`docs/phases/`)
@@ -648,6 +649,7 @@ A feature is complete only when implementation, tests, authorization/failure beh
 - [phase-1-architecture-and-foundation.md](docs/phases/phase-1-architecture-and-foundation.md) — Architecture, 12-table ERD/schema, typed contracts, gateway & CI scaffold.
 - [phase-2-assessment-platform.md](docs/phases/phase-2-assessment-platform.md) — Multi-tenant RBAC, 5 question modules, durable attempts, Judge0 execution, Capsules, and React portals.
 - [phase-3-infrastructure-and-deployment.md](docs/phases/phase-3-infrastructure-and-deployment.md) — Network segmentation, Standalone & Central profiles, offline LAN HTTPS, worker heartbeats, backup/restore & `O-03` audit.
+- [phase-4-monitoring-and-telemetry.md](docs/phases/phase-4-monitoring-and-telemetry.md) — Workload-classified Prometheus metrics, normalized `telemetry_samples`, stale/missing fallback, Grafana dashboards, and overhead audit.
 
 ### Target Documentation Layout
 Maintain documentation alongside implementation:
@@ -703,7 +705,7 @@ Rules:
 
 ## 18. Current Status
 
-**Current phase: Phase 4 — Monitoring and Telemetry (Phases 0–3 complete)**
+**Current phase: Phase 5 — Capacity-Aware Resource Orchestration (Phases 0–4 complete)**
 
 | Phase | Status |
 |---|---|
@@ -711,7 +713,7 @@ Rules:
 | 1 — Architecture and foundation | Complete |
 | 2 — Core assessment platform | Complete |
 | 3 — Infrastructure and deployment | Complete |
-| 4 — Monitoring and telemetry | Not started |
+| 4 — Monitoring and telemetry | Complete |
 | 5 — Resource orchestration | Not started |
 | 6 — Security orchestration | Not started |
 | 7 — Integration and control plane | Not started |
