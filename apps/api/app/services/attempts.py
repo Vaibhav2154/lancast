@@ -13,6 +13,7 @@ from app.contracts.interfaces import (
     ExecutionQueueContract,
 )
 from app.core.errors import api_error
+from app.core.metrics import AUTOSAVE_TOTAL, EXECUTION_QUEUE_REJECTIONS_TOTAL
 from app.core.timeutil import as_utc, utcnow
 from app.db.models import (
     Assessment,
@@ -278,6 +279,7 @@ async def upsert_response(
             await db.flush()
         except IntegrityError as exc:
             await db.rollback()
+            AUTOSAVE_TOTAL.labels(outcome="conflict").inc()
             raise api_error(409, "CONCURRENT_SAVE", "Concurrent save; retry with a higher seq") from exc
         return response, True
 
@@ -285,6 +287,7 @@ async def upsert_response(
         return existing, False  # stale/replayed older save: ignored
     if client_seq == existing.client_seq:
         if existing.payload_json != normalized:
+            AUTOSAVE_TOTAL.labels(outcome="conflict").inc()
             raise api_error(409, "SEQ_CONFLICT", "Same client_seq with a different payload")
         return existing, False  # idempotent retry
     existing.payload_json = normalized
@@ -411,6 +414,7 @@ async def submit_attempt(
         .where(Response.attempt_id == attempt.id, Question.question_type == "coding")
     )
     if coding_count and not await queue.has_capacity(int(coding_count)):
+        EXECUTION_QUEUE_REJECTIONS_TOTAL.inc()
         raise api_error(503, "QUEUE_FULL", "Execution queue is full; retry shortly")
 
     late = utcnow() > as_utc(attempt.deadline_at)

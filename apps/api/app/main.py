@@ -3,7 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.core.metrics import PrometheusMiddleware
 from app.routers import admin, assessments, attempts, auth, capsules, internal, tenants
+from app.routers.health import metrics_router
 from app.routers.health import router as health_router
 
 
@@ -20,6 +22,7 @@ def create_app() -> FastAPI:
         redoc_url="/api/redoc",
     )
 
+    application.add_middleware(PrometheusMiddleware)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.public_base_url, "http://localhost:5173", "http://localhost"],
@@ -29,6 +32,7 @@ def create_app() -> FastAPI:
     )
 
     application.include_router(health_router)
+    application.include_router(metrics_router)
     application.include_router(admin.router)
     application.include_router(auth.router)
     application.include_router(tenants.router)

@@ -11,6 +11,16 @@ http:
       priority: 200
       tls: {}
 
+    metrics-block-tls:
+      rule: "PathPrefix(`/metrics`)"
+      entryPoints:
+        - websecure
+      service: lancast-api
+      middlewares:
+        - block-internal
+      priority: 200
+      tls: {}
+
     api-router-tls:
       rule: "PathPrefix(`/api`)"
       entryPoints:

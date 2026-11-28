@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
 from app.core.errors import api_error
+from app.core.metrics import AUTHZ_DENIALS_TOTAL
 from app.core.security import decode_token
 from app.core.timeutil import as_utc, utcnow
 from app.db.models import Membership, Tenant, User, UserSession
@@ -111,6 +112,7 @@ async def deny(
         reason_code=reason_code,
         metadata=metadata,
     )
+    AUTHZ_DENIALS_TOTAL.labels(reason_code=reason_code).inc()
     await db.commit()
     raise api_error(status_code, "FORBIDDEN", "You do not have access to this resource")
 

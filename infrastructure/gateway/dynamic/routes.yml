@@ -45,6 +45,15 @@ http:
         - block-internal
       priority: 200
 
+    metrics-block:
+      rule: "PathPrefix(`/metrics`)"
+      entryPoints:
+        - web
+      service: lancast-api
+      middlewares:
+        - block-internal
+      priority: 200
+
     api-router:
       rule: "PathPrefix(`/api`)"
       entryPoints:

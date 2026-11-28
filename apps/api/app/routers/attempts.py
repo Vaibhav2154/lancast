@@ -16,6 +16,7 @@ from app.core.deps import (
     deny,
 )
 from app.core.errors import api_error
+from app.core.metrics import AUTOSAVE_TOTAL, CODE_RUN_TOTAL, SUBMISSIONS_TOTAL
 from app.core.timeutil import as_utc, utcnow
 from app.db.models import (
     Assessment,
@@ -249,6 +250,7 @@ async def save_response(
     question = await svc.get_attempt_question(db, attempt, question_id)
     saved, applied = await svc.save_response(db, attempt, question, body.payload, body.client_seq)
     await db.commit()
+    AUTOSAVE_TOTAL.labels(outcome="applied" if applied else "replayed").inc()
     return SavedResponseOut(
         question_id=question_id,
         applied=applied,
@@ -270,6 +272,9 @@ async def submit(
     if created:
         await svc.dispatch_jobs(db, queue, jobs)
         await db.refresh(submission)
+        SUBMISSIONS_TOTAL.labels(status=submission.status).inc()
+    else:
+        SUBMISSIONS_TOTAL.labels(status="replayed").inc()
     response.status_code = 201 if created else 200
     return SubmissionOut(
         id=submission.id,
@@ -383,8 +388,12 @@ async def run_code(
                 cpu_time_limit_sec=cpu_limit,
                 memory_limit_mb=mem_limit,
             )
+            CODE_RUN_TOTAL.labels(language=normalized["language"], verdict=out["verdict"]).inc()
             results.append(out)
     except SandboxUnavailableError as exc:
+        CODE_RUN_TOTAL.labels(
+            language=normalized["language"], verdict="sandbox_unavailable"
+        ).inc()
         raise api_error(
             503,
             "SANDBOX_UNAVAILABLE",

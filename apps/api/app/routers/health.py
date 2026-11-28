@@ -8,9 +8,18 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import Settings, get_settings
+from app.core.metrics import (
+    EXECUTION_DEAD_LETTER_DEPTH,
+    EXECUTION_QUEUE_DEPTH,
+    render_prometheus_metrics,
+)
 from app.db.session import get_engine
+from app.services.execution_queue import QUEUE_KEY
+
+DEAD_LETTER_KEY = "lancast:execution:dead"
 
 router = APIRouter(prefix="/api", tags=["health"])
+metrics_router = APIRouter(tags=["metrics"], include_in_schema=False)
 
 
 async def check_postgres() -> bool:
@@ -79,3 +88,32 @@ async def readiness(
             "redis": "ok" if redis_ok else "unreachable",
         },
     }
+
+
+async def refresh_queue_metrics(redis_url: str) -> None:
+    """Best-effort refresh of bounded queue and dead-letter gauges on /metrics scrape."""
+    client: Redis | None = None
+    try:
+        client = Redis.from_url(redis_url, socket_connect_timeout=0.5, socket_timeout=0.5)
+        EXECUTION_QUEUE_DEPTH.set(int(await client.llen(QUEUE_KEY)))
+        EXECUTION_DEAD_LETTER_DEPTH.set(int(await client.llen(DEAD_LETTER_KEY)))
+    except (RedisError, OSError):
+        pass
+    finally:
+        if client is not None:
+            await client.aclose()
+
+
+def get_queue_metrics_refresher() -> Callable[[str], Awaitable[None]]:
+    return refresh_queue_metrics
+
+
+@metrics_router.get("/metrics")
+async def prometheus_metrics(
+    settings: Annotated[Settings, Depends(get_settings)],
+    refresher: Annotated[Callable[[str], Awaitable[None]], Depends(get_queue_metrics_refresher)],
+) -> Response:
+    """Internal Prometheus scrape endpoint (blocked at Traefik on :80/:443; FR-OBS-01..03)."""
+    await refresher(settings.redis_url)
+    body, media_type = render_prometheus_metrics()
+    return Response(content=body, media_type=media_type)

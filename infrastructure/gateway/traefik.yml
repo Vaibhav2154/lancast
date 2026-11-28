@@ -8,6 +8,8 @@ entryPoints:
     address: ":443"
   worker:
     address: ":8081"
+  metrics:
+    address: ":8082"
 
 providers:
   file:
@@ -16,6 +18,7 @@ providers:
 
 metrics:
   prometheus:
+    entryPoint: metrics
     addEntryPointsLabels: true
     addServicesLabels: true
 
