@@ -10,8 +10,9 @@ from app.core.errors import api_error
 from app.core.timeutil import utcnow
 from app.db.models import ExecutionJob, Question, WorkerNode
 from app.schemas.attempts import ExecutionResultIn
-from app.schemas.infrastructure import WorkerHeartbeatIn, WorkerHeartbeatOut
+from app.schemas.infrastructure import TelemetrySampleIn, WorkerHeartbeatIn, WorkerHeartbeatOut
 from app.services import attempts as attempt_svc
+from app.services import telemetry as telemetry_svc
 
 # Worker-only surface. Traefik blocks /api/internal on candidate ports; the shared secret is a
 # second layer (defense in depth). Workers hold no database credentials (T19).
@@ -100,3 +101,17 @@ async def worker_heartbeat(
 
     await db.commit()
     return WorkerHeartbeatOut(worker_id=node.worker_id, status=node.status, recorded_at=now)
+
+
+@router.post("/telemetry/samples")
+async def ingest_telemetry_sample(
+    body: TelemetrySampleIn,
+    db: DbSession,
+    settings: AppSettings,
+    x_worker_token: Annotated[str | None, Header()] = None,
+) -> dict:
+    """Ingest a normalized host/worker telemetry sample (FR-RES-01, T12)."""
+    _verify_worker_token(x_worker_token, settings)
+    row = await telemetry_svc.ingest_sample(db, settings, body)
+    await db.commit()
+    return {"id": row.id, "machine_id": row.machine_id, "collected_at": row.collected_at}

@@ -14,6 +14,11 @@ const VARIANT_MAP: Record<string, { label: string; badge: string; dot: string }>
     badge: "bg-accent-soft text-accent-text border-accent-border",
     dot: "bg-accent",
   },
+  healthy: {
+    label: "Healthy",
+    badge: "bg-accent-soft text-accent-text border-accent-border",
+    dot: "bg-accent",
+  },
   online: {
     label: "Online",
     badge: "bg-accent-soft text-accent-text border-accent-border",
@@ -108,6 +113,16 @@ const VARIANT_MAP: Record<string, { label: string; badge: string; dot: string }>
     label: "Offline",
     badge: "bg-danger-soft text-danger border-danger/30",
     dot: "bg-danger",
+  },
+  missing: {
+    label: "Missing",
+    badge: "bg-danger-soft text-danger border-danger/30",
+    dot: "bg-danger",
+  },
+  stale: {
+    label: "Stale",
+    badge: "bg-warn-soft text-warn border-warn/30",
+    dot: "bg-warn",
   },
 };
 

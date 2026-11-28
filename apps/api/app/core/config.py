@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # Observability & safety bounds
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     execution_queue_max_depth: int = Field(default=500, ge=1, le=100000)
+    telemetry_stale_seconds: int = Field(default=45, ge=5, le=600)
+    telemetry_retention_hours: int = Field(default=24, ge=1, le=720)
+    telemetry_max_clock_skew_seconds: int = Field(default=60, ge=5, le=600)
 
     # File uploads (T10)
     upload_dir: str = "/var/lib/lancast/uploads"

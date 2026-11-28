@@ -257,3 +257,23 @@ class WorkerNode(Base):
     last_heartbeat_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False, index=True
     )
+
+
+class TelemetrySampleRecord(Base):
+    __tablename__ = "telemetry_samples"
+
+    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
+    machine_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(32), default="worker", nullable=False)
+    collected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False, index=True
+    )
+    cpu_percent: Mapped[float] = mapped_column(Float, nullable=False)
+    memory_percent: Mapped[float] = mapped_column(Float, nullable=False)
+    disk_percent: Mapped[float] = mapped_column(Float, nullable=False)
+    network_rx_kbps: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    network_tx_kbps: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    queue_depth: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    active_jobs: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    healthy: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)

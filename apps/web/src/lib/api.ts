@@ -45,6 +45,39 @@ export interface InfrastructureStatus {
   workers: WorkerNodeInfo[];
 }
 
+export interface TelemetryMachineSample {
+  id: number;
+  machine_id: string;
+  role: string;
+  collected_at: string;
+  cpu_percent: number;
+  memory_percent: number;
+  disk_percent: number;
+  network_rx_kbps: number;
+  network_tx_kbps: number;
+  queue_depth: number;
+  active_jobs: number;
+  healthy: boolean;
+  stale: boolean;
+  age_seconds: number;
+}
+
+export interface WorkloadLatencyStats {
+  count: number;
+  p50_ms: number;
+  p95_ms: number;
+  p99_ms: number;
+}
+
+export interface TelemetryOverview {
+  telemetry_state: "healthy" | "degraded" | "missing" | string;
+  safe_fallback_active: boolean;
+  stale_threshold_seconds: number;
+  retention_hours: number;
+  machines: TelemetryMachineSample[];
+  workload_latencies: Record<string, WorkloadLatencyStats>;
+}
+
 export type TenantRole = "tenant_admin" | "organizer" | "candidate";
 
 export interface AuthUser {
@@ -343,6 +376,10 @@ export async function fetchReadiness(): Promise<ReadinessInfo> {
 
 export async function getAdminInfrastructure(): Promise<InfrastructureStatus> {
   return request<InfrastructureStatus>("/api/admin/infrastructure");
+}
+
+export async function getAdminTelemetry(): Promise<TelemetryOverview> {
+  return request<TelemetryOverview>("/api/admin/telemetry");
 }
 
 // Auth

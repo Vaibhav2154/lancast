@@ -11,7 +11,12 @@ from app.core.deps import AppSettings, DbSession, PlatformAdmin
 from app.core.timeutil import as_utc, utcnow
 from app.db.models import WorkerNode
 from app.routers.health import get_db_checker, get_redis_checker
-from app.schemas.infrastructure import InfrastructureStatusOut, WorkerNodeOut
+from app.schemas.infrastructure import (
+    InfrastructureStatusOut,
+    TelemetryOverviewOut,
+    WorkerNodeOut,
+)
+from app.services import telemetry as telemetry_svc
 from app.services.execution_queue import QUEUE_KEY
 
 DEAD_LETTER_KEY = "lancast:execution:dead"
@@ -108,3 +113,13 @@ async def infrastructure_status(
         worker_stale_seconds=WORKER_STALE_SECONDS,
         workers=worker_rows,
     )
+
+
+@router.get("/telemetry", response_model=TelemetryOverviewOut)
+async def telemetry_overview(
+    _admin: PlatformAdmin,
+    db: DbSession,
+    settings: AppSettings,
+) -> TelemetryOverviewOut:
+    """Return normalized host/worker telemetry snapshots, stale state, and rolling latencies."""
+    return await telemetry_svc.get_normalized_snapshot(db, settings)

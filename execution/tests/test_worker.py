@@ -4,7 +4,14 @@ import httpx
 import pytest
 
 from dispatcher.sandbox import Judge0Runner, SandboxError
-from dispatcher.worker import check_judge0_health, process_job, report_result, send_heartbeat
+from dispatcher.telemetry import HostTelemetryCollector
+from dispatcher.worker import (
+    check_judge0_health,
+    process_job,
+    report_result,
+    send_heartbeat,
+    send_telemetry_sample,
+)
 
 JOB = {
     "job_id": "j1",
@@ -142,3 +149,38 @@ def test_worker_heartbeat_and_judge0_health():
     failing = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
     assert check_judge0_health(failing, "http://judge0:2358") is False
     assert send_heartbeat(failing, "http://api:8000", "secret-token", {"worker_id": "w1"}) is False
+
+
+def test_host_telemetry_collector_and_sample_sender():
+    collector = HostTelemetryCollector()
+    sample = collector.sample()
+    for key in ("cpu_percent", "memory_percent", "disk_percent"):
+        assert 0.0 <= sample[key] <= 100.0
+    assert sample["network_rx_kbps"] >= 0.0 and sample["network_tx_kbps"] >= 0.0
+
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200, json={"id": 1})
+
+    ok_client = httpx.Client(transport=httpx.MockTransport(handler))
+    assert (
+        send_telemetry_sample(
+            ok_client,
+            "http://api:8000",
+            "secret-token",
+            {"machine_id": "worker-1", **sample},
+        )
+        is True
+    )
+    assert calls[0].url.path == "/api/internal/telemetry/samples"
+    assert calls[0].headers["X-Worker-Token"] == "secret-token"
+
+    fail_client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(500)))
+    assert (
+        send_telemetry_sample(
+            fail_client, "http://api:8000", "secret-token", {"machine_id": "worker-1"}
+        )
+        is False
+    )

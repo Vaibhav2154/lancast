@@ -1,13 +1,15 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Building2, Cpu, Plus, RefreshCw } from "lucide-react";
+import { Activity, Building2, Cpu, Plus, RefreshCw } from "lucide-react";
 import { AppShell } from "../components/AppShell";
 import { StatusBadge } from "../components/StatusBadge";
 import { TenantMembersPanel } from "../components/TenantMembersPanel";
 import {
   createTenant,
   getAdminInfrastructure,
+  getAdminTelemetry,
   InfrastructureStatus,
   listTenants,
+  TelemetryOverview,
   Tenant,
 } from "../lib/api";
 
@@ -15,6 +17,7 @@ export function AdminPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [infra, setInfra] = useState<InfrastructureStatus | null>(null);
+  const [telemetry, setTelemetry] = useState<TelemetryOverview | null>(null);
   const [infraLoading, setInfraLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +29,12 @@ export function AdminPage() {
   const loadInfra = useCallback(async () => {
     setInfraLoading(true);
     try {
-      setInfra(await getAdminInfrastructure());
+      const [infraData, telemetryData] = await Promise.all([
+        getAdminInfrastructure(),
+        getAdminTelemetry().catch(() => null),
+      ]);
+      setInfra(infraData);
+      setTelemetry(telemetryData);
     } catch {
       // Non-fatal: tenant administration remains usable even if telemetry fails.
     } finally {
@@ -188,6 +196,95 @@ export function AdminPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {telemetry && (
+                <div className="space-y-3 border-t border-subtle pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-accent-text" />
+                      <h3 className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                        Host Telemetry &amp; Workload Latency
+                      </h3>
+                      <StatusBadge
+                        status={telemetry.telemetry_state}
+                        label={
+                          telemetry.safe_fallback_active
+                            ? `${telemetry.telemetry_state} — Safe Fallback`
+                            : "Healthy"
+                        }
+                      />
+                    </div>
+                    <span className="text-[11px] text-ink-muted">
+                      Stale window: {telemetry.stale_threshold_seconds}s • Operator Grafana:{" "}
+                      <code className="font-mono text-ink">http://127.0.0.1:3000</code>
+                    </span>
+                  </div>
+
+                  {telemetry.machines.length === 0 ? (
+                    <p className="rounded-xl border border-subtle bg-elevated/40 px-4 py-2.5 text-xs text-ink-muted">
+                      No telemetry samples received yet — orchestration stays in safe fallback mode
+                      until fresh samples arrive.
+                    </p>
+                  ) : (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {telemetry.machines.map((m) => (
+                        <div
+                          key={m.machine_id}
+                          className="rounded-xl border border-subtle bg-elevated/40 px-4 py-3 text-xs"
+                        >
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <span className="font-mono font-bold text-ink">
+                              {m.machine_id}{" "}
+                              <span className="font-normal text-ink-muted">({m.role})</span>
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] text-ink-muted">{m.age_seconds}s ago</span>
+                              <StatusBadge status={m.stale ? "stale" : m.healthy ? "healthy" : "degraded"} />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-4 gap-2 text-[11px]">
+                            <div>
+                              <span className="block text-ink-muted">CPU</span>
+                              <span className="font-bold text-ink">{m.cpu_percent.toFixed(1)}%</span>
+                            </div>
+                            <div>
+                              <span className="block text-ink-muted">RAM</span>
+                              <span className="font-bold text-ink">{m.memory_percent.toFixed(1)}%</span>
+                            </div>
+                            <div>
+                              <span className="block text-ink-muted">Disk</span>
+                              <span className="font-bold text-ink">{m.disk_percent.toFixed(1)}%</span>
+                            </div>
+                            <div>
+                              <span className="block text-ink-muted">Net RX/TX</span>
+                              <span className="font-bold text-ink">
+                                {m.network_rx_kbps.toFixed(0)}/{m.network_tx_kbps.toFixed(0)} KB/s
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {Object.keys(telemetry.workload_latencies).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(telemetry.workload_latencies).map(([wclass, stats]) => (
+                        <div
+                          key={wclass}
+                          className="rounded-lg border border-subtle bg-elevated/50 px-3 py-1.5 text-[11px]"
+                        >
+                          <span className="font-mono font-bold text-accent-text">{wclass}</span>{" "}
+                          <span className="text-ink-muted">({stats.count})</span>:{" "}
+                          <span className="font-semibold text-ink">
+                            P50 {stats.p50_ms}ms • P95 {stats.p95_ms}ms • P99 {stats.p99_ms}ms
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
