@@ -23,6 +23,10 @@ services:
       JUDGE0_URL: http://judge0-server:2358
       WORKER_ID: ${WORKER_ID:-worker-node-1}
       DEPLOYMENT_PROFILE: central
+      METRICS_PORT: 9108
+    ports:
+      # Optional worker Prometheus scrape port; bind to management IP + firewall to Prometheus server.
+      - "${WORKER_METRICS_BIND_IP:-127.0.0.1}:${WORKER_METRICS_PORT:-9108}:9108"
     depends_on:
       - judge0-server
     mem_limit: 256m

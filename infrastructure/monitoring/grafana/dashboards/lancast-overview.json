@@ -1,0 +1,142 @@
+{
+  "uid": "lancast-overview",
+  "title": "LANCAST — Workload & Exam Latency Overview",
+  "tags": ["lancast", "workloads", "latency"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "API Status",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "lancast-prometheus" },
+      "targets": [{ "expr": "max(up{job=\"lancast-api\"})", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Online Workers",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "lancast-prometheus" },
+      "targets": [{ "expr": "sum(up{job=\"lancast-workers\"})", "refId": "A" }]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Execution Queue Depth",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "lancast-prometheus" },
+      "targets": [{ "expr": "max(lancast_execution_queue_depth)", "refId": "A" }]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Dead-Letter Queue",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "lancast-prometheus" },
+      "targets": [{ "expr": "max(lancast_execution_dead_letter_depth)", "refId": "A" }]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Queue Rejections (5m)",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "lancast-prometheus" },
+      "targets": [{ "expr": "sum(increase(lancast_execution_queue_rejections_total[5m])) or vector(0)", "refId": "A" }]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Authz Denials (5m)",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "lancast-prometheus" },
+      "targets": [{ "expr": "sum(increase(lancast_authz_denials_total[5m])) or vector(0)", "refId": "A" }]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "HTTP Request Rate by Workload Class (req/s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "lancast-prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (workload_class) (rate(lancast_http_requests_total[1m]))",
+          "legendFormat": "{{workload_class}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Autosave Latency Percentiles (P50 / P95 / P99)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "lancast-prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(lancast_http_request_duration_seconds_bucket{workload_class=\"interactive_autosave\"}[2m])))",
+          "legendFormat": "P50 autosave",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(lancast_http_request_duration_seconds_bucket{workload_class=\"interactive_autosave\"}[2m])))",
+          "legendFormat": "P95 autosave",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(lancast_http_request_duration_seconds_bucket{workload_class=\"interactive_autosave\"}[2m])))",
+          "legendFormat": "P99 autosave",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "P95 Latency Across All Workload Classes",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "lancast-prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, workload_class) (rate(lancast_http_request_duration_seconds_bucket{workload_class!=\"health\"}[2m])))",
+          "legendFormat": "P95 {{workload_class}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Code Runs & Submissions by Outcome",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "lancast-prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (language, verdict) (rate(lancast_code_run_total[2m]))",
+          "legendFormat": "run {{language}}/{{verdict}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (status) (rate(lancast_submissions_total[2m]))",
+          "legendFormat": "submit {{status}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    }
+  ]
+}

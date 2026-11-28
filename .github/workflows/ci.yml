@@ -130,3 +130,15 @@ jobs:
 
       - name: Validate TLS gateway overlay
         run: docker compose -f docker-compose.yml -f infrastructure/gateway/compose.tls.yml config --quiet
+
+      - name: Validate monitoring stack overlay
+        run: docker compose -f docker-compose.yml -f docker-compose.coding.yml -f docker-compose.monitoring.yml config --quiet
+
+      - name: Validate Prometheus config and alert rules
+        run: |
+          docker run --rm --entrypoint promtool \
+            -v "$PWD/infrastructure/monitoring/prometheus:/etc/prometheus:ro" \
+            prom/prometheus:v2.55.1 check config /etc/prometheus/prometheus.yml
+          docker run --rm --entrypoint promtool \
+            -v "$PWD/infrastructure/monitoring/prometheus:/etc/prometheus:ro" \
+            prom/prometheus:v2.55.1 check rules /etc/prometheus/alerts.yml

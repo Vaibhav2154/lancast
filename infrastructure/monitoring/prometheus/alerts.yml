@@ -1,0 +1,98 @@
+groups:
+  - name: lancast-availability
+    rules:
+      - alert: LancastApiDown
+        expr: up{job="lancast-api"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "LANCAST API scrape target is down"
+          description: "Prometheus cannot scrape lancast-api (/metrics) for 30 seconds."
+
+      - alert: LancastWorkerOffline
+        expr: up{job="lancast-workers"} == 0
+        for: 45s
+        labels:
+          severity: warning
+        annotations:
+          summary: "LANCAST execution dispatcher is unreachable"
+          description: "Worker target {{ $labels.instance }} failed Prometheus scrapes for 45 seconds."
+
+      - alert: LancastJudge0Unhealthy
+        expr: lancast_worker_judge0_up == 0
+        for: 45s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Judge0 sandbox is unhealthy on worker {{ $labels.instance }}"
+          description: "Dispatcher Judge0 /about health probe is returning 0."
+
+      - alert: LancastTelemetryStale
+        expr: absent(up{job="node-exporter"} == 1)
+        for: 45s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host telemetry exporter is missing or stale"
+          description: "Node Exporter is absent; Phase 5 orchestration should enter safe fallback."
+
+  - name: lancast-workload-and-capacity
+    rules:
+      - alert: LancastQueueHigh
+        expr: lancast_execution_queue_depth > 350
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Bounded execution queue depth is elevated"
+          description: "Execution queue depth exceeded 350 jobs (70% of default 500 cap)."
+
+      - alert: LancastQueueRejections
+        expr: increase(lancast_execution_queue_rejections_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Coding submissions rejected due to full execution queue"
+          description: "At least one submission received HTTP 503 QUEUE_FULL in the last 5 minutes."
+
+      - alert: LancastAutosaveLatencyHigh
+        expr: >-
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(lancast_http_request_duration_seconds_bucket{workload_class="interactive_autosave"}[2m]))
+          ) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Interactive autosave P95 latency exceeded 500 ms (provisional threshold)"
+          description: "Candidate answer-save P95 latency is above 0.5s; review coding/DB contention (O-08)."
+
+      - alert: LancastHostCpuHigh
+        expr: (100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100)) > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU utilization exceeded 85%"
+          description: "Host CPU load on {{ $labels.instance }} stayed above 85% for 2 minutes."
+
+      - alert: LancastHostMemoryHigh
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory utilization exceeded 85%"
+          description: "Available RAM on {{ $labels.instance }} dropped below 15% for 2 minutes."
+
+      - alert: LancastDiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Root filesystem free disk space below 15%"
+          description: "Disk space on {{ $labels.instance }} is below 15%; check uploads/DB/TSDB growth."

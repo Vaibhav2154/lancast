@@ -1,0 +1,146 @@
+# LANCAST Monitoring & Telemetry Stack Overlay (Phase 4 — FR-RES-01, FR-OBS-01..03, TD-06)
+#
+# Usage (Standalone + Coding + Monitoring):
+#   docker compose -f docker-compose.yml -f docker-compose.coding.yml -f docker-compose.monitoring.yml up -d
+#
+# Security & Privacy (NFR-SEC-03, DEP-06, T20):
+#   - Prometheus (:9090) and Grafana (:3000) bind ONLY to 127.0.0.1 by default (operator-only).
+#   - Exporters have NO published host ports; they are reachable only on `lancast_monitoring`.
+#   - Grafana analytics & update checks are disabled for zero runtime Internet traffic.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--storage.tsdb.retention.size=2GB"
+      - "--web.enable-lifecycle"
+    ports:
+      - "${MONITORING_BIND_IP:-127.0.0.1}:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./infrastructure/monitoring/prometheus/targets:/etc/prometheus/targets:ro
+      - prometheus_data:/prometheus
+    mem_limit: 512m
+    cpus: "1.0"
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - lancast_monitoring
+      - lancast_internal
+      - lancast_edge
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    restart: unless-stopped
+    ports:
+      - "${MONITORING_BIND_IP:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-lancast-grafana-dev}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/lancast-overview.json
+    volumes:
+      - ./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    mem_limit: 384m
+    cpus: "0.75"
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - lancast_monitoring
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    restart: unless-stopped
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    mem_limit: 64m
+    cpus: "0.25"
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - lancast_monitoring
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    restart: unless-stopped
+    command:
+      - "--housekeeping_interval=15s"
+      - "--docker_only=true"
+      - "--store_container_labels=false"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    mem_limit: 192m
+    cpus: "0.5"
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - lancast_monitoring
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_URI: postgres:5432/${POSTGRES_DB:-lancast}?sslmode=disable
+      DATA_SOURCE_USER: ${POSTGRES_USER:-lancast}
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD:-lancast}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 96m
+    cpus: "0.25"
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - lancast_monitoring
+      - lancast_internal
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.66.0
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    mem_limit: 64m
+    cpus: "0.25"
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - lancast_monitoring
+      - lancast_internal
+
+networks:
+  lancast_monitoring:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  grafana_data:

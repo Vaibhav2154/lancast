@@ -1,0 +1,9 @@
+[
+  {
+    "targets": ["dispatcher:9108"],
+    "labels": {
+      "deployment_mode": "standalone",
+      "worker_id": "dispatcher-1"
+    }
+  }
+]
